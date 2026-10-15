@@ -1,1 +1,1 @@
-# mschool-b2b
+# mschool
