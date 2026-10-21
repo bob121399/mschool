@@ -64,4 +64,12 @@ Env: `.env.local` (не в git) — см. `.env.example`. Для локальн�
 
 ## Текущий этап
 
-См. верх `docs/implementation-status.md`.
+Шаги 1–6 реализованы; финальный статус и блокеры — верх `docs/implementation-status.md` и `docs/delivery-report.md`.
+MVP не объявлять готовым, пока не сняты BLK-01 (live AI), BLK-02 (антивирус) и BLK-03 (окружения).
+
+## Подводные камни среды
+
+- `pkill -f "next start"` убивает и вызывающую shell-команду — останавливайте сервер через `fuser -k 3000/tcp`.
+- Docker Hub отвечает 429: базовые образы берите из `public.ecr.aws/docker/library/*`.
+- Playwright: `PW_EXECUTABLE_PATH=/opt/pw-browsers/chromium` (браузеры не скачивать).
+- Тестовые hash-эмбеддинги не семантичны: в RAG-тестах вопрос должен совпадать с текстом чанка.

@@ -8,10 +8,26 @@ import { Alert } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/toast";
 import { apiFetch, errorMessage } from "@/lib/client/api";
 
+export type ReasonKind = "tenant-update" | "invoice-generate" | "role" | "subscription" | "mark-paid" | "lead-invite";
+
+/** Request bodies are built client-side from a serializable kind + context (functions cannot cross
+ * the server → client boundary). */
+function buildBody(kind: ReasonKind, ctx: Record<string, string>, v: Record<string, string>, reason: string): unknown {
+  switch (kind) {
+    case "tenant-update": return { tier: v.tier, status: v.status, maxDailyAiCalls: Number(v.max), reason };
+    case "invoice-generate": return { tenantId: ctx.tenantId, periodStart: v.month };
+    case "role": return { role: ctx.role, reason };
+    case "subscription": return { tenantId: ctx.tenantId, tier: v.tier, currency: v.currency, seatPriceMinor: v.tier === "enterprise" ? 0 : Number(v.seat),
+      minimumMinor: Number(v.min), periodStart: v.start, periodEnd: v.end, contract: { reference: v.ref ?? "" }, reason };
+    case "mark-paid": return { paymentReference: v.ref, paidAt: new Date(`${v.date}T12:00:00Z`).toISOString(), reason };
+    case "lead-invite": return { reason };
+  }
+}
+
 /** Generic "reason required" action dialog for audited superadmin mutations. */
-export function ReasonAction({ label, title, consequence, endpoint, method = "POST", build, fields, variant = "secondary" }: {
+export function ReasonAction({ label, title, consequence, endpoint, method = "POST", kind, context = {}, fields, variant = "secondary" }: {
   label: string; title: string; consequence: string; endpoint: string; method?: "POST" | "PATCH";
-  build: (values: Record<string, string>, reason: string) => unknown; fields?: { name: string; label: string; type?: string; options?: { value: string; label: string }[]; initial?: string }[];
+  kind: ReasonKind; context?: Record<string, string>; fields?: { name: string; label: string; type?: string; options?: { value: string; label: string }[]; initial?: string }[];
   variant?: "primary" | "secondary" | "danger";
 }) {
   const router = useRouter();
@@ -28,7 +44,7 @@ export function ReasonAction({ label, title, consequence, endpoint, method = "PO
         footer={<><Button variant="secondary" onClick={() => setOpen(false)}>Отмена</Button>
           <Button variant={variant === "danger" ? "danger" : "primary"} loading={loading} disabled={reason.trim().length < 10} onClick={async () => {
             setLoading(true);
-            const r = await apiFetch(endpoint, { method, body: build(values, reason) });
+            const r = await apiFetch(endpoint, { method, body: buildBody(kind, context, values, reason) });
             setLoading(false);
             if (!r.ok) { setError(errorMessage(r.error)); return; }
             setOpen(false); toast.show("success", "Сохранено, действие записано в журнал"); router.refresh();

@@ -54,10 +54,10 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/s
             fields={[{ name: "tier", label: "Тариф", initial: t.subscription_tier, options: ["start", "growth", "enterprise"].map((v) => ({ value: v, label: v })) },
               { name: "status", label: "Статус", initial: t.status, options: Object.entries(tenantStatusLabels).map(([value, label]) => ({ value, label })) },
               { name: "max", label: "Лимит ИИ-вызовов в сутки", type: "number", initial: String(t.max_daily_ai_calls) }]}
-            build={(v, r) => ({ tier: v.tier, status: v.status, maxDailyAiCalls: Number(v.max), reason: r })} />
+            kind="tenant-update" />
           <ReasonAction label="Счет за прошлый месяц" title="Сформировать счет" consequence="Счет за закрытый месяц; повтор вернет существующий счет."
             endpoint="/api/superadmin/invoices" fields={[{ name: "month", label: "Первый день месяца", type: "date", initial: lastMonth.toISOString().slice(0, 10) }]}
-            build={(v) => ({ tenantId: id, periodStart: v.month })} />
+            kind="invoice-generate" context={{ tenantId: id }} />
         </>} />
       <p className="mb-4 text-sm"><Link className="underline" href="/superadmin/tenants">← Компании</Link></p>
       <div className="grid gap-6 xl:grid-cols-2">
@@ -68,9 +68,9 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/s
                 <span className="min-w-0 flex-1">{u.full_name || u.email}<br /><span className="text-xs text-muted-foreground">{u.email}</span></span>
                 <Badge>{roleLabels[u.role]}</Badge>{u.status !== "active" ? <Badge tone="warning">приостановлен</Badge> : null}
                 {u.role === "employee" ? <ReasonAction label="Сделать HR" title="Повышение до HR" consequence="Пользователь получит управление учебным контентом и сотрудниками компании."
-                  endpoint={`/api/superadmin/users/${u.id}/role`} build={(_v, r) => ({ role: "hr_admin", reason: r })} />
+                  endpoint={`/api/superadmin/users/${u.id}/role`} kind="role" context={{ role: "hr_admin" }} />
                   : u.role === "hr_admin" ? <ReasonAction label="Снять роль HR" title="Снятие роли HR" consequence="Нельзя снять роль с последнего HR без замены." variant="danger"
-                  endpoint={`/api/superadmin/users/${u.id}/role`} build={(_v, r) => ({ role: "employee", reason: r })} /> : null}
+                  endpoint={`/api/superadmin/users/${u.id}/role`} kind="role" context={{ role: "employee" }} /> : null}
               </li>
             ))}
           </ul>
@@ -83,8 +83,7 @@ export default async function TenantPage({ params, searchParams }: PageProps<"/s
             { name: "min", label: "Минимум в месяц (в минимальных единицах)", type: "number", initial: "30000" },
             { name: "start", label: "Начало", type: "date", initial: "" }, { name: "end", label: "Окончание", type: "date", initial: "" },
             { name: "ref", label: "Номер договора", initial: "" }]}
-          build={(v, r) => ({ tenantId: id, tier: v.tier, currency: v.currency, seatPriceMinor: v.tier === "enterprise" ? 0 : Number(v.seat),
-            minimumMinor: Number(v.min), periodStart: v.start, periodEnd: v.end, contract: { reference: v.ref }, reason: r })} />}>
+          kind="subscription" context={{ tenantId: id }} />}>
           <ul className="space-y-2 text-sm">
             {(subs.data ?? []).map((s) => <li key={s.id}>{s.tier} · {s.currency} · место {formatMoney(s.seat_price_minor, s.currency)} · минимум {formatMoney(s.minimum_monthly_minor, s.currency)} · {formatDate(s.period_start)}—{formatDate(s.period_end)} · {s.status}</li>)}
             {(subs.data ?? []).length === 0 ? <li className="text-muted-foreground">Подписки нет (trial).</li> : null}

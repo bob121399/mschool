@@ -2,6 +2,7 @@ import { aiConfigured } from "@/lib/config";
 import { modelEnv, responseJSON } from "@/lib/ai/openai";
 import { HELP_ARTICLES } from "@/lib/help/articles";
 import { SUPPORT_PROMPT, supportOutput } from "@/prompts";
+import { supportTextProblems } from "@/lib/ai/guards";
 import { PermanentJobError, TransientJobError } from "../errors";
 import { recordAgentRun, type JobContext, type JobOutcome } from "../context";
 import type { Json } from "@/lib/database.types";
@@ -33,6 +34,7 @@ export async function support(ctx: JobContext): Promise<JobOutcome> {
       jsonSchema: SUPPORT_PROMPT.jsonSchema, validator: supportOutput, maxOutputTokens: SUPPORT_PROMPT.maxOutputTokens,
       input: { ticket: { subject: t.data.subject, body: t.data.body }, help_articles: HELP_ARTICLES,
         billing_summary: { subscription: sub.data?.[0] ?? null, recent_invoices: invoices.data ?? [] } } });
+    if (supportTextProblems(generated.value.answer).length > 0) throw new TransientJobError("AI_SCHEMA_MISMATCH");
     const known = new Set<string>(HELP_ARTICLES.map((a) => a.id));
     if (generated.value.article_ids.some((id) => !known.has(id))) throw new TransientJobError("AI_SCHEMA_MISMATCH");
     reply = { source: "agent", model, prompt_version: SUPPORT_PROMPT.version, ...generated.value,

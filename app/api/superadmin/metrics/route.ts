@@ -11,5 +11,5 @@ export const GET = route(async (request) => {
   const month = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/u).parse(params.get("month"));
   const currency = z.enum(["USD", "UZS"]).default("USD").parse(params.get("currency") ?? undefined);
   const { db } = await superadminContext();
-  return json(await platformMetrics(db, month, currency));
+  return json(await platformMetrics(db, month, currency, params.get("includeDemo") === "true"));
 }, { mutation: false });

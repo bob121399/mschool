@@ -13,7 +13,7 @@
     "test:integration": "vitest run --project integration",
     "test:evals": "vitest run --project evals",
     "test:e2e": "playwright test",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "tsx --conditions=react-server scripts/seed.ts",
     "worker:dev": "tsx --conditions=react-server worker/main.ts",
     "worker:start": "tsx --conditions=react-server worker/main.ts",
     "db:types": "supabase gen types typescript --local > lib/database.types.ts",

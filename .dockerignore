@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+.secrets
+test-results
+playwright-report
+supabase/.temp
+supabase/.branches
+docs/screenshots

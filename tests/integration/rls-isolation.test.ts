@@ -252,3 +252,11 @@ describe("SEC-12 suspended tenant loses access", () => {
     }
   });
 });
+
+describe("Superadmin before MFA", () => {
+  it("reads only its own profile row (to be routed to MFA), nothing global", async () => {
+    const aal1 = await signIn(w.superadmin.email, w.password);
+    const own = await aal1.from("users").select("id,role");
+    expect(own.data).toEqual([{ id: w.superadmin.id, role: "superadmin" }]);
+  });
+});

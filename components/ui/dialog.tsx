@@ -1,7 +1,7 @@
 "use client";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 
@@ -12,12 +12,21 @@ export function Dialog({ open, onOpenChange, title, description, children, foote
   open: boolean; onOpenChange: (open: boolean) => void; title: string; description?: string;
   children?: ReactNode; footer?: ReactNode; preventOutsideClose?: boolean; wide?: boolean;
 }) {
+  // Radix restores focus only to a Dialog.Trigger; our dialogs open from state, so we return focus
+  // to the element that was focused when the dialog opened (spec 4.2: возврат фокуса).
+  const returnTo = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    returnTo.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => { const el = returnTo.current; setTimeout(() => el?.isConnected && el.focus(), 0); };
+  }, [open]);
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
         <RadixDialog.Content
           onPointerDownOutside={preventOutsideClose ? (e) => e.preventDefault() : undefined}
+          onCloseAutoFocus={(e) => { e.preventDefault(); returnTo.current?.focus(); }}
           className={cn("fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2",
             "overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl", wide ? "max-w-3xl" : "max-w-lg")}
           {...(description ? {} : { "aria-describedby": undefined })}

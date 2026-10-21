@@ -1,0 +1,49 @@
+# Reproducible dev/test run of the app components. Supabase itself runs via `npx supabase start`
+# (its own containers); web/worker reach it through host.docker.internal.
+# Usage:
+#   npx supabase start
+#   docker compose --env-file .env.docker up --build
+# .env.docker (not in git) contains the same names as .env.example; NEXT_PUBLIC_SUPABASE_URL must be
+# reachable from the browser AND from containers (e.g. http://host.docker.internal:54321 with a hosts entry).
+services:
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+        APP_VERSION: ${APP_VERSION:-compose}
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_TUTOR_MODEL: ${OPENAI_TUTOR_MODEL:-}
+      OPENAI_ASSESSOR_MODEL: ${OPENAI_ASSESSOR_MODEL:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_WORKER_MODEL: ${OPENAI_WORKER_MODEL:-}
+      MSCHOOL_DEMO_MODE: ${MSCHOOL_DEMO_MODE:-true}
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
+    ports: ["3000:3000"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    stop_grace_period: 30s
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      target: worker
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_WORKER_MODEL: ${OPENAI_WORKER_MODEL:-}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      CLAMAV_HOST: ${CLAMAV_HOST:-}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    # Graceful shutdown: SIGTERM stops claiming; running jobs get up to 60 s, then their lease expires.
+    stop_grace_period: 70s
+    restart: unless-stopped

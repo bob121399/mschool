@@ -25,7 +25,7 @@ export default async function LeadsPage() {
                 <span className="ml-auto flex gap-2">
                   <SimpleAction label="Квалифицировать (AI)" endpoint={`/api/superadmin/leads/${l.id}/qualify`} body={{}} done="Задача поставлена в очередь" />
                   {!l.tenant_id ? <ReasonAction label="Пригласить на пилот" title="Приглашение на пилот" consequence="На email лида будет отправлено письмо Supabase Auth со ссылкой на регистрацию пространства."
-                    endpoint={`/api/superadmin/leads/${l.id}/invite`} build={(_v, r) => ({ reason: r })} /> : null}
+                    endpoint={`/api/superadmin/leads/${l.id}/invite`} kind="lead-invite" /> : null}
                 </span></div>
               {q?.qualification ? <p>Оценка: {q.qualification}, fit {q.fit_score}. {q.summary} {q.missing_fields?.length ? `Не хватает: ${q.missing_fields.join(", ")}` : ""}</p> : null}
             </li>

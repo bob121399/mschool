@@ -1,7 +1,7 @@
 // Durable worker (spec 3.9): separate Node process, concurrency limit, claim via
 // FOR UPDATE SKIP LOCKED (claim_job), heartbeat 20 s / lease 90 s, ≤3 attempts with exponential
 // backoff + jitter, scheduler tick every minute, graceful shutdown on SIGTERM/SIGINT.
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { workerDb } from "./context";
 import { JOB_TYPES, log, runJob } from "./process";
@@ -13,8 +13,14 @@ const db = workerDb();
 let stopping = false;
 const running = new Set<Promise<void>>();
 
+function touchHeartbeat() {
+  // Container liveness probe (Dockerfile HEALTHCHECK); failures are non-fatal.
+  try { writeFileSync("/tmp/worker-heartbeat", String(Date.now())); } catch { /* read-only fs */ }
+}
+
 async function claimLoop() {
   while (!stopping) {
+    touchHeartbeat();
     if (running.size >= concurrency) { await Promise.race(running); continue; }
     const { data, error } = await db.rpc("claim_job", { p_types: JOB_TYPES });
     if (error) { log("claim_error", { code: error.code }); await sleep(5000); continue; }

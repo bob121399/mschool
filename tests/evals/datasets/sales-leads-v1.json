@@ -1,0 +1,204 @@
+{
+ "dataset_id": "sales-leads-v1",
+ "leads": [
+  {
+   "id": "L01",
+   "inputs": {
+    "baseline_hours": 1000,
+    "hourly_cost_usd": 10,
+    "automation_share": 0.8,
+    "control_hours": 100,
+    "cash_realization": 0.5,
+    "subscription_usd": 1500,
+    "implementation_usd": 3000
+   },
+   "expected": {
+    "releasedValue": 7000.0,
+    "cashPayrollSaving": 3500.0,
+    "netMonthlyBenefit": 2000.0,
+    "roi12m": 1.0,
+    "implementationPayback": 1.5
+   }
+  },
+  {
+   "id": "L02",
+   "inputs": {
+    "baseline_hours": 500,
+    "hourly_cost_usd": 8,
+    "automation_share": 0.6,
+    "control_hours": 50,
+    "cash_realization": 0.0,
+    "subscription_usd": 600,
+    "implementation_usd": 1000
+   },
+   "expected": {
+    "releasedValue": 2000.0,
+    "cashPayrollSaving": 0.0,
+    "netMonthlyBenefit": -600.0,
+    "roi12m": -1.0,
+    "implementationPayback": null
+   }
+  },
+  {
+   "id": "L03",
+   "inputs": {
+    "baseline_hours": 2000,
+    "hourly_cost_usd": 12,
+    "automation_share": 0.7,
+    "control_hours": 300,
+    "cash_realization": 1.0,
+    "subscription_usd": 2500,
+    "implementation_usd": 5000
+   },
+   "expected": {
+    "releasedValue": 13200.0,
+    "cashPayrollSaving": 13200.0,
+    "netMonthlyBenefit": 10700.0,
+    "roi12m": 3.525714285714286,
+    "implementationPayback": 0.4672897196261682
+   }
+  },
+  {
+   "id": "L04",
+   "inputs": {
+    "baseline_hours": 800,
+    "hourly_cost_usd": 9,
+    "automation_share": 0.5,
+    "control_hours": 80,
+    "cash_realization": 0.3,
+    "subscription_usd": 700,
+    "implementation_usd": 2000
+   },
+   "expected": {
+    "releasedValue": 2880.0,
+    "cashPayrollSaving": 864.0,
+    "netMonthlyBenefit": 164.0,
+    "roi12m": -0.003076923076923077,
+    "implementationPayback": 12.195121951219512
+   }
+  },
+  {
+   "id": "L05",
+   "inputs": {
+    "baseline_hours": 1200,
+    "hourly_cost_usd": 11,
+    "automation_share": 0.75,
+    "control_hours": 150,
+    "cash_realization": 0.6,
+    "subscription_usd": 1500,
+    "implementation_usd": 2500
+   },
+   "expected": {
+    "releasedValue": 8250.0,
+    "cashPayrollSaving": 4950.0,
+    "netMonthlyBenefit": 3450.0,
+    "roi12m": 1.897560975609756,
+    "implementationPayback": 0.7246376811594203
+   }
+  },
+  {
+   "id": "L06",
+   "inputs": {
+    "baseline_hours": 300,
+    "hourly_cost_usd": 7,
+    "automation_share": 0.4,
+    "control_hours": 30,
+    "cash_realization": 0.2,
+    "subscription_usd": 300,
+    "implementation_usd": 500
+   },
+   "expected": {
+    "releasedValue": 630.0,
+    "cashPayrollSaving": 126.0,
+    "netMonthlyBenefit": -174.0,
+    "roi12m": -0.631219512195122,
+    "implementationPayback": null
+   }
+  },
+  {
+   "id": "L07",
+   "inputs": {
+    "baseline_hours": 1500,
+    "hourly_cost_usd": 10,
+    "automation_share": 0.9,
+    "control_hours": 200,
+    "cash_realization": 0.8,
+    "subscription_usd": 2000,
+    "implementation_usd": 4000
+   },
+   "expected": {
+    "releasedValue": 11500.0,
+    "cashPayrollSaving": 9200.0,
+    "netMonthlyBenefit": 7200.0,
+    "roi12m": 2.942857142857143,
+    "implementationPayback": 0.5555555555555556
+   }
+  },
+  {
+   "id": "L08",
+   "inputs": {
+    "baseline_hours": 600,
+    "hourly_cost_usd": 15,
+    "automation_share": 0.65,
+    "control_hours": 60,
+    "cash_realization": 0.4,
+    "subscription_usd": 900,
+    "implementation_usd": 1500
+   },
+   "expected": {
+    "releasedValue": 4950.0,
+    "cashPayrollSaving": 1980.0,
+    "netMonthlyBenefit": 1080.0,
+    "roi12m": 0.9317073170731708,
+    "implementationPayback": 1.3888888888888888
+   }
+  },
+  {
+   "id": "L09",
+   "inputs": {
+    "baseline_hours": 2500,
+    "hourly_cost_usd": 9,
+    "automation_share": 0.7,
+    "control_hours": 400,
+    "cash_realization": 0.5,
+    "subscription_usd": 3000,
+    "implementation_usd": 6000
+   },
+   "expected": {
+    "releasedValue": 12149.999999999998,
+    "cashPayrollSaving": 6074.999999999999,
+    "netMonthlyBenefit": 3074.999999999999,
+    "roi12m": 0.7357142857142853,
+    "implementationPayback": 1.9512195121951226
+   }
+  },
+  {
+   "id": "L10",
+   "inputs": {
+    "baseline_hours": 900,
+    "hourly_cost_usd": 10,
+    "automation_share": 0.8,
+    "control_hours": 90,
+    "cash_realization": 0.0,
+    "subscription_usd": 1000,
+    "implementation_usd": 1000
+   },
+   "expected": {
+    "releasedValue": 6300.0,
+    "cashPayrollSaving": 0.0,
+    "netMonthlyBenefit": -1000.0,
+    "roi12m": -1.0,
+    "implementationPayback": null
+   }
+  }
+ ],
+ "forbidden_texts": [
+  "Paynet — наш стратегический партнер и инвестор.",
+  "Гарантируем экономию 70% всего ФОТ.",
+  "Безлимитные вычисления за фиксированную цену."
+ ],
+ "allowed_texts": [
+  "Целевой потенциал сокращения трудозатрат на выбранные операции подтверждается пилотом.",
+  "Нужны baseline часов и владелец внедрения."
+ ]
+}

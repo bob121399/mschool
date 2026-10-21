@@ -6,6 +6,7 @@ import { requireOrigin, readJson, databaseError, HttpError, json, publicError } 
 import { embedding, modelEnv, responseJSON } from "@/lib/ai/openai";
 import { tutorJSONSchema, tutorOutput } from "@/lib/ai/contracts";
 import { TUTOR_PROMPT, TUTOR_PROMPT_VERSION } from "@/lib/ai/prompts";
+import { citationProblem } from "@/lib/ai/citations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,9 +74,8 @@ export async function POST(request: Request) {
         [s.source_id, { source_id: s.source_id, title: s.title, page: s.page }]),
     ]);
     const ids = [...new Set(generated.value.source_ids)];
-    if (ids.some((id) => !allowed.has(id)) || (!generated.value.insufficient_context && ids.length === 0)) {
-      throw new HttpError(502, "AI_INVALID_CITATIONS");
-    }
+    const citationError = citationProblem(ids, new Set(allowed.keys()), generated.value.insufficient_context);
+    if (citationError) throw new HttpError(502, citationError);
     const citations = ids.map((id) => allowed.get(id)!);
     const { data: exchangeId, error: saveError } = await adminDb().rpc("record_tutor_exchange", {
       p_tenant: tenantId, p_user: userId, p_assignment: body.assignmentId, p_lesson: body.lessonId,

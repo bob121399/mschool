@@ -4,7 +4,7 @@ import { databaseError } from "@/lib/http";
 import { mrrForMonth, nrr, grr, type Currency } from "@/lib/billing/metrics";
 
 export type PlatformMetrics = {
-  month: string; cutoff: string; currency: Currency;
+  month: string; cutoff: string; currency: Currency; include_demo: boolean;
   mrr_minor: number | null; arr_minor: number | null; paying_tenants: number; active_seats: number | null;
   prev_mrr_minor: number | null; nrr: number | null; grr: number | null;
   bridge: { start: number; new: number; expansion: number; contraction: number; churn: number; end: number } | null;
@@ -12,7 +12,7 @@ export type PlatformMetrics = {
 };
 
 /** Deterministic platform metrics from invoices (closed month), demo excluded (spec 4.3/5.4). */
-export async function platformMetrics(db: UserDb, month: string, currency: Currency): Promise<PlatformMetrics> {
+export async function platformMetrics(db: UserDb, month: string, currency: Currency, includeDemo = false): Promise<PlatformMetrics> {
   const start = `${month}-01`;
   const prev = new Date(`${start}T00:00:00Z`);
   prev.setUTCMonth(prev.getUTCMonth() - 1);
@@ -29,7 +29,8 @@ export async function platformMetrics(db: UserDb, month: string, currency: Curre
   ]);
   if (inv.error) databaseError(inv.error);
   if (tenants.error) databaseError(tenants.error);
-  const rows = (inv.data ?? []).map((r) => ({ ...r, is_demo: Boolean((r.tenants as { is_demo: boolean } | null)?.is_demo) }));
+  // Demo tenants are excluded from production metrics; includeDemo is an explicit, labelled view.
+  const rows = (inv.data ?? []).map((r) => ({ ...r, is_demo: !includeDemo && Boolean((r.tenants as { is_demo: boolean } | null)?.is_demo) }));
   const perTenant = (monthStart: string) => {
     const map = new Map<string, number>();
     for (const r of rows) {
@@ -40,8 +41,9 @@ export async function platformMetrics(db: UserDb, month: string, currency: Curre
   };
   const cur = perTenant(start);
   const before = perTenant(prevStart);
-  const mrr = rows.length === 0 ? null : mrrForMonth(rows, start, currency);
-  const prevMrr = rows.length === 0 ? null : mrrForMonth(rows, prevStart, currency);
+  const counted = rows.filter((r) => !r.is_demo && r.currency === currency);
+  const mrr = counted.length === 0 ? null : mrrForMonth(rows, start, currency);
+  const prevMrr = counted.length === 0 ? null : mrrForMonth(rows, prevStart, currency);
   let bridge: PlatformMetrics["bridge"] = null;
   if (mrr !== null && prevMrr !== null) {
     let expansion = 0, contraction = 0, churn = 0, added = 0;
@@ -54,7 +56,7 @@ export async function platformMetrics(db: UserDb, month: string, currency: Curre
   }
   const seatRows = rows.filter((r) => !r.is_demo && r.period_start === start && (r.status === "issued" || r.status === "paid"));
   return {
-    month, cutoff: new Date().toISOString(), currency,
+    month, cutoff: new Date().toISOString(), currency, include_demo: includeDemo,
     mrr_minor: mrr, arr_minor: mrr === null ? null : mrr * 12, paying_tenants: cur.size,
     active_seats: seatRows.length ? seatRows.reduce((s, r) => s + r.active_seats, 0) : null,
     prev_mrr_minor: prevMrr, nrr: before.size ? nrr(before, cur) : null, grr: before.size ? grr(before, cur) : null, bridge,

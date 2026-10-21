@@ -6,6 +6,7 @@ import { requireOrigin, readJson, databaseError, HttpError, json, publicError } 
 import { modelEnv, responseJSON } from "@/lib/ai/openai";
 import { assessmentResult, rubricSchema, evaluationOutput, evaluationJSONSchema } from "@/lib/ai/contracts";
 import { ASSESSOR_PROMPT, ASSESSOR_PROMPT_VERSION } from "@/lib/ai/prompts";
+import { evaluationProblem } from "@/lib/ai/assessment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,17 +63,8 @@ export async function POST(request: Request) {
       jsonSchema: evaluationJSONSchema(ids), validator: evaluationOutput, maxOutputTokens: 5000,
       input: { question: ctx.data.assessment_question, rubric: rubric.data, answer: body.answer },
     });
-    if (generated.value.criteria.length !== ids.length
-      || new Set(generated.value.criteria.map((c) => c.id)).size !== ids.length) {
-      throw new HttpError(502, "AI_CRITERION_MISMATCH");
-    }
-    for (const item of generated.value.criteria) {
-      const rule = rubric.data.criteria.find((c) => c.id === item.id);
-      if (!rule || item.points > rule.max_points || (item.points > 0 && item.evidence === "")
-        || (item.evidence !== "" && !body.answer.includes(item.evidence))) {
-        throw new HttpError(502, "AI_INVALID_EVIDENCE");
-      }
-    }
+    const problem = evaluationProblem(rubric.data, body.answer, generated.value);
+    if (problem) throw new HttpError(502, problem);
     const { data: finalData, error: finalError } = await admin.rpc("finish_assessment", {
       p_attempt: start.data.attempt_id, p_lease: start.data.lease_token,
       p_evaluation: generated.value,

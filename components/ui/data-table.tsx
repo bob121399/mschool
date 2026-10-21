@@ -49,6 +49,7 @@ export function DataTable({ columns, rows, total, page, pageSize, sort, dir, sea
           </select>
         </label>
       </div>
+      <p className="text-xs text-muted-foreground lg:hidden" aria-hidden>Таблица прокручивается горизонтально →</p>
       <div className="relative overflow-x-auto rounded-card border border-border bg-surface" tabIndex={0} role="region" aria-label={caption}>
         <table className="w-full min-w-[720px] text-sm">
           <caption className="sr-only">{caption}</caption>

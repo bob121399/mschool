@@ -29,7 +29,7 @@ export default async function SuperBilling() {
                   <td className="p-3">{i.status === "issued" ? <ReasonAction label="Подтвердить оплату" title="Подтверждение оплаты" consequence="Только по подтвержденному платежному документу. Действие необратимо и журналируется."
                     endpoint={`/api/superadmin/invoices/${i.id}/mark-paid`}
                     fields={[{ name: "ref", label: "Номер платежного документа", initial: "" }, { name: "date", label: "Дата оплаты", type: "date", initial: new Date().toISOString().slice(0, 10) }]}
-                    build={(v, r) => ({ paymentReference: v.ref, paidAt: new Date(`${v.date}T12:00:00Z`).toISOString(), reason: r })} /> : null}</td></tr>
+                    kind="mark-paid" /> : null}</td></tr>
               );
             })}</tbody>
           </table>

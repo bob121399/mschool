@@ -3,6 +3,7 @@ import { requireSuperadmin } from "@/lib/auth/guard";
 import { platformMetrics } from "@/lib/billing/platform";
 import { PageHeader } from "@/components/shell/app-shell";
 import { Card, MetricCard } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
 import { formatMoney } from "@/lib/i18n/labels";
 
 export const metadata: Metadata = { title: "Платформа" };
@@ -19,8 +20,9 @@ export default async function SuperadminHome({ searchParams }: PageProps<"/super
   const sp = await searchParams;
   const month = typeof sp.month === "string" && /^\d{4}-\d{2}$/u.test(sp.month) ? sp.month : lastClosedMonth();
   const currency = sp.currency === "UZS" ? "UZS" : "USD";
-  const m = await platformMetrics(ctx.db, month, currency);
-  const period = `Закрытый месяц ${month}, ${currency}; срез ${new Date(m.cutoff).toLocaleString("ru-RU")}`;
+  const includeDemo = sp.demo === "1";
+  const m = await platformMetrics(ctx.db, month, currency, includeDemo);
+  const period = `Закрытый месяц ${month}, ${currency}${includeDemo ? ", с demo" : ""}; срез ${new Date(m.cutoff).toLocaleString("ru-RU")}`;
   const money = (v: number | null) => (v === null ? null : formatMoney(v, currency));
   const pct = (v: number | null) => (v === null ? "N/A" : `${(v * 100).toFixed(1)}%`);
   return (
@@ -29,8 +31,10 @@ export default async function SuperadminHome({ searchParams }: PageProps<"/super
       <form className="mb-6 flex flex-wrap items-end gap-3" method="get">
         <label className="flex flex-col gap-1 text-sm">Месяц<input type="month" name="month" defaultValue={month} className="min-h-11 rounded-lg border border-border bg-surface px-3" /></label>
         <label className="flex flex-col gap-1 text-sm">Валюта<select name="currency" defaultValue={currency} className="min-h-11 rounded-lg border border-border bg-surface px-3"><option>USD</option><option>UZS</option></select></label>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" name="demo" value="1" defaultChecked={includeDemo} className="size-5" />Включить демо-компании</label>
         <button className="min-h-11 rounded-lg border border-border px-4 hover:bg-muted">Показать</button>
       </form>
+      {includeDemo ? <div className="mb-6"><Alert kind="warning" title="Включены демонстрационные компании">Показатели ниже содержат синтетические данные и не являются выручкой.</Alert></div> : null}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="MRR" value={money(m.mrr_minor)} period={period} definition="Сумма регулярных счетов закрытого месяца (issued/paid), нормализованная на месяц; trial, one-off и demo исключены." />
         <MetricCard label="ARR (run-rate)" value={money(m.arr_minor)} period={period} definition="12 × MRR. Это run-rate, не фактическая годовая выручка." />
