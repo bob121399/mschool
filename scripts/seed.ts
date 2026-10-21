@@ -1,5 +1,6 @@
 // Local/test seed (spec 6 step 6.2–6.6). Hard-fails unless ALLOW_SEED=true and the Supabase host is
-// local. Drafts and chunks are created with the service client (trusted fixture path); approval,
+// local — or, for a dedicated hosted demo project, an exact typed confirmation naming that project and
+// an empty tenants table (never an environment with real customers). Drafts and chunks are created with the service client (trusted fixture path); approval,
 // publication and assignment run under the HR's own session, so human-gate triggers stay active.
 // Synthetic content only: «демонстрационные регламенты», no real Paynet rules, clients or secrets.
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -10,6 +11,8 @@ import { chunkPages } from "../lib/chunking";
 import { parseInChild } from "../worker/parse";
 import { totp } from "../tests/support/totp";
 import { TEST_EMBEDDING_MODEL, testEmbedding } from "./lib/test-embedding";
+import { embeddings } from "../lib/ai/openai";
+import { aiConfigured } from "../lib/config";
 import {
   createAuthUser, createEmployee, createSuperadmin, enrollTotp, lessonsOfCourse, must, provisionTenant, publishTrack,
   RUBRIC_FIXTURE, serviceClient, signIn, supabaseEnv, type Db, type Grade,
@@ -20,12 +23,28 @@ if (existsSync(".env.local") && !process.env.SUPABASE_SECRET_KEY) loadEnvFile(".
 const GRADES: Grade[] = ["junior", "middle", "senior", "head"];
 const DOMAIN = "demo.mschool.local";
 
-function guard() {
+/** Returns true for a confirmed hosted demo project (main() then also requires an empty tenants table). */
+function guard(): boolean {
   if (process.env.ALLOW_SEED !== "true") throw new Error("Refusing to seed: set ALLOW_SEED=true (local/test only).");
   const host = new URL(supabaseEnv().url).hostname;
-  if (!["127.0.0.1", "localhost", "host.docker.internal"].includes(host)) {
-    throw new Error(`Refusing to seed remote host ${host}. Seed is local/test only.`);
+  if (["127.0.0.1", "localhost", "host.docker.internal"].includes(host)) return false;
+  const ref = host.endsWith(".supabase.co") ? host.split(".")[0] : null;
+  const expected = `SEED SYNTHETIC DEMO INTO ${ref}`;
+  if (!ref || process.env.SEED_REMOTE_DEMO_CONFIRM !== expected) {
+    throw new Error(`Refusing to seed remote host ${host}. For a dedicated demo project set SEED_REMOTE_DEMO_CONFIRM="${expected}".`);
   }
+  return true;
+}
+
+/** Real embeddings when AI is configured (query time uses the same model), else the test namespace (D-09). */
+async function embedChunks(contents: string[]) {
+  if (!aiConfigured()) return contents.map((c) => ({ embedding: testEmbedding(c), embedding_model: TEST_EMBEDDING_MODEL }));
+  const out: { embedding: string; embedding_model: string }[] = [];
+  for (let i = 0; i < contents.length; i += 128) {
+    const { model, vectors } = await embeddings(contents.slice(i, i + 128));
+    out.push(...vectors.map((embedding) => ({ embedding, embedding_model: model })));
+  }
+  return out;
 }
 
 function password(): string {
@@ -50,8 +69,9 @@ async function source(admin: Db, hr: Db, tenantId: string, file: string, title: 
   }
   must(await admin.from("documents").update({ status: "processing" }).eq("id", id).select("id"), "processing");
   const chunks = chunkPages(parsed.pages);
+  const vectors = await embedChunks(chunks.map((c) => c.content));
   const rows = chunks.map((c, i) => ({ tenant_id: tenantId, document_id: id, chunk_index: i, page: c.page, content: c.content,
-    embedding: testEmbedding(c.content), embedding_model: TEST_EMBEDDING_MODEL }));
+    ...vectors[i]! }));
   const inserted = must(await admin.from("document_chunks").insert(rows).select("id,chunk_index"), "chunks");
   must(await admin.from("documents").update({ status: "review", page_count: parsed.pages.length, char_count: text })
     .eq("id", id).select("id"), "review");
@@ -122,12 +142,16 @@ async function attempt(admin: Db, emp: Db, assignment: string, lesson: string, c
 }
 
 async function main() {
-  guard();
+  const remote = guard();
   const admin = serviceClient();
+  if (remote) {
+    const any = await admin.from("tenants").select("id", { count: "exact", head: true });
+    if (any.error || (any.count ?? 0) > 0) throw new Error("Refusing to seed: hosted demo project must have no tenants.");
+  }
   const existing = await admin.from("tenants").select("id").in("name", ["Demo Retail A", "Demo Service B"]);
   if (existing.data?.length) throw new Error("Already seeded. Run `npx supabase db reset` first (local only).");
   const pw = password();
-  const creds: Record<string, unknown> = { note: "LOCAL DEMO ONLY. Do not commit or publish.", password: pw, accounts: {} as Record<string, string> };
+  const creds: Record<string, unknown> = { note: "DEMO ONLY (synthetic). Do not commit or publish.", password: pw, accounts: {} as Record<string, string> };
   const accounts = creds.accounts as Record<string, string>;
 
   const saEmail = `superadmin@${DOMAIN}`;
@@ -218,8 +242,9 @@ async function main() {
         control_hours: 100, cash_realization: 0.5, subscription_usd: 1500, implementation_usd: 3000 } } }).select("id"), "lead");
   }
   mkdirSync(".secrets", { recursive: true });
-  writeFileSync(".secrets/seed-credentials.json", JSON.stringify(creds, null, 2), { mode: 0o600 });
-  console.log(JSON.stringify({ status: "ok", tenants: 2, credentials_file: ".secrets/seed-credentials.json" }));
+  const credsFile = process.env.SEED_CREDENTIALS_FILE?.trim() || ".secrets/seed-credentials.json";
+  writeFileSync(credsFile, JSON.stringify(creds, null, 2), { mode: 0o600 });
+  console.log(JSON.stringify({ status: "ok", tenants: 2, credentials_file: credsFile }));
 }
 
 main().catch((e: unknown) => {

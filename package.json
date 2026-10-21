@@ -22,7 +22,8 @@
     "smoke": "tsx scripts/smoke.ts",
     "check:bundle": "tsx scripts/check-bundle-secrets.ts",
     "demo": "bash scripts/demo/demo.sh",
-    "demo:code": "tsx scripts/demo/code.ts"
+    "demo:code": "tsx scripts/demo/code.ts",
+    "demo:hosted": "tsx --conditions=react-server scripts/demo/hosted-setup.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.3.1",
