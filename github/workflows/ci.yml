@@ -1,0 +1,61 @@
+name: ci
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # No real secrets are exposed to untrusted PR code: local Supabase keys are generated per run,
+    # and OPENAI_* stay empty (AI routes return AI_NOT_CONFIGURED; evals use the test-only fetch mock).
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npx supabase start -x studio,realtime,edge-runtime,logflare,vector
+      - run: npx supabase db reset
+      - name: Generated types match migrations
+        run: npx supabase gen types typescript --local > /tmp/types.ts && diff -u lib/database.types.ts /tmp/types.ts
+      - name: Local env
+        run: |
+          eval "$(npx supabase status -o env)"
+          {
+            echo "APP_ORIGIN=http://localhost:3000"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY"
+            echo "SUPABASE_SECRET_KEY=$SECRET_KEY"
+            echo "OPENAI_EMBEDDING_MODEL=text-embedding-3-small"
+            echo "MSCHOOL_DEMO_MODE=true"
+          } > .env.local
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test
+      - run: npm run test:integration
+      - run: npm run test:evals
+      - run: ALLOW_SEED=true npm run seed
+      - run: npm run build
+      - run: npm run check:bundle
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+  live-ai-smoke:
+    # Live provider smoke only in the protected environment, manually approved.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: live-ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run probe
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_TUTOR_MODEL: ${{ vars.OPENAI_TUTOR_MODEL }}
+          OPENAI_ASSESSOR_MODEL: ${{ vars.OPENAI_ASSESSOR_MODEL }}
+          OPENAI_WORKER_MODEL: ${{ vars.OPENAI_WORKER_MODEL }}
+          OPENAI_EMBEDDING_MODEL: text-embedding-3-small
