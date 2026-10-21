@@ -1,0 +1,14 @@
+# Never upload local secrets, credentials or build/test output to Vercel.
+.secrets
+.env
+.env.*
+!.env.example
+.demo
+.next
+node_modules
+test-results
+playwright-report
+supabase/.temp
+supabase/.branches
+docs/screenshots
+tsconfig.tsbuildinfo

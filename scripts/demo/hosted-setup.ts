@@ -1,20 +1,19 @@
-// Sets up the HOSTED DEMO: a dedicated Supabase project (created if needed) + the Render services from
-// render.yaml. Synthetic data only. Refuses any Supabase project whose name lacks "demo" and seeds only
+// Sets up the HOSTED DEMO: a dedicated Supabase project (created if needed) + a Vercel project for the
+// Next.js app. Synthetic data only. Refuses any Supabase project whose name lacks "demo" and seeds only
 // into a project with no tenants, so it cannot touch an environment with real customers.
+// The durable worker is not hosted on Vercel: background jobs (new uploads, weekly reports) stay queued.
 //
-// Required env: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD.
+// Required env: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, VERCEL_TOKEN.
 // Optional env: DEMO_SUPABASE_PROJECT_REF (else a project "mschool-demo" is found or created),
-//   SUPABASE_ORG_SLUG (when the account has several organizations), RENDER_API_KEY (sets service env
-//   vars and triggers deploys), DEMO_APP_ORIGIN (default: the Render web service URL), OPENAI_* (live AI).
-// Run: npx tsx --conditions=react-server scripts/demo/hosted-setup.ts
+//   SUPABASE_ORG_SLUG / VERCEL_TEAM_ID (when the account has several), OPENAI_* (live AI).
+// Run: npm run demo:hosted
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const SB = "https://api.supabase.com/v1";
-const RENDER = "https://api.render.com/v1";
+const VERCEL = "https://api.vercel.com";
+const VERCEL_CLI = "vercel@65.0.0";
 const PROJECT_NAME = "mschool-demo";
-const WEB = "mschool-demo";
-const WORKER = "mschool-demo-worker";
 const CREDS = ".secrets/hosted-demo-credentials.json";
 
 function env(name: string): string {
@@ -74,24 +73,50 @@ function template(name: string) {
   return readFileSync(`supabase/templates/${name}.html`, "utf8");
 }
 
+type Vercel = { token: string; teamId: string; projectId: string };
+
+async function vercelProject(token: string): Promise<Vercel> {
+  const teams = await api<{ teams: { id: string; slug: string }[] }>(VERCEL, token, "GET", "/v2/teams");
+  const teamId = opt("VERCEL_TEAM_ID") ?? (teams.teams.length === 1 ? teams.teams[0]!.id : undefined);
+  if (!teamId) throw new Error(`Several Vercel teams (${teams.teams.map((t) => `${t.slug}=${t.id}`).join(", ")}): set VERCEL_TEAM_ID`);
+  const q = `teamId=${encodeURIComponent(teamId)}`;
+  let id: string;
+  try {
+    id = (await api<{ id: string }>(VERCEL, token, "GET", `/v9/projects/${PROJECT_NAME}?${q}`)).id;
+  } catch (error) {
+    if (!String(error).includes("→ 404")) throw error;
+    step(`Создание проекта Vercel «${PROJECT_NAME}»`);
+    id = (await api<{ id: string }>(VERCEL, token, "POST", `/v11/projects?${q}`, { name: PROJECT_NAME, framework: "nextjs" })).id;
+  }
+  return { token, teamId, projectId: id };
+}
+
+async function vercelEnv(v: Vercel, values: Record<string, string>) {
+  const body = Object.entries(values).map(([key, value]) => ({ key, value, type: "encrypted", target: ["production"] }));
+  const res = await api<{ failed: unknown[] }>(VERCEL, v.token, "POST", `/v10/projects/${v.projectId}/env?upsert=true&teamId=${v.teamId}`, body);
+  if (res.failed.length) throw new Error(`Vercel env: ${JSON.stringify(res.failed).slice(0, 300)}`);
+}
+
+async function vercelOrigin(v: Vercel): Promise<string | undefined> {
+  const res = await api<{ domains: { name: string }[] }>(VERCEL, v.token, "GET", `/v9/projects/${v.projectId}/domains?teamId=${v.teamId}`);
+  const domain = res.domains.find((d) => d.name.endsWith(".vercel.app"))?.name ?? res.domains[0]?.name;
+  return domain ? `https://${domain}` : undefined;
+}
+
+function vercelDeploy(v: Vercel) {
+  step("Сборка и публикация на Vercel (~3–5 минут)");
+  const r = spawnSync("npx", ["--yes", VERCEL_CLI, "deploy", "--prod", "--yes", "--token", v.token], {
+    stdio: ["ignore", "pipe", "inherit"],
+    env: { ...process.env, VERCEL_ORG_ID: v.teamId, VERCEL_PROJECT_ID: v.projectId, VERCEL_TELEMETRY_DISABLED: "1" },
+  });
+  if (r.status !== 0) throw new Error(`vercel deploy failed (exit ${r.status})`);
+  return r.stdout.toString().trim();
+}
+
 async function main() {
   const token = env("SUPABASE_ACCESS_TOKEN");
   const dbPassword = env("SUPABASE_DB_PASSWORD");
-  const renderKey = opt("RENDER_API_KEY");
-
-  let renderWeb: { id: string; url?: string } | undefined;
-  let renderWorker: { id: string } | undefined;
-  if (renderKey) {
-    type Item = { service: { id: string; name: string; serviceDetails?: { url?: string } } };
-    const items = await api<Item[]>(RENDER, renderKey, "GET", `/services?name=${WEB},${WORKER}&limit=20`);
-    const web = items.find((i) => i.service.name === WEB)?.service;
-    const worker = items.find((i) => i.service.name === WORKER)?.service;
-    if (!web) throw new Error(`Render service "${WEB}" not found: create the Blueprint from render.yaml first (docs/demo-hosting.md)`);
-    renderWeb = { id: web.id, url: web.serviceDetails?.url };
-    renderWorker = worker ? { id: worker.id } : undefined;
-  }
-  const origin = (opt("DEMO_APP_ORIGIN") ?? renderWeb?.url)?.replace(/\/$/u, "");
-  if (!origin) throw new Error("Set DEMO_APP_ORIGIN or RENDER_API_KEY (origin is taken from the Render web service)");
+  const vercel = await vercelProject(env("VERCEL_TOKEN"));
 
   const project = await supabaseProject(token, dbPassword);
   const ref = project.ref;
@@ -101,6 +126,45 @@ async function main() {
   const cliEnv = { SUPABASE_ACCESS_TOKEN: token, SUPABASE_DB_PASSWORD: dbPassword };
   cli(["link", "--project-ref", ref], cliEnv);
   cli(["db", "push", "--linked", "--yes"], cliEnv);
+
+  type Key = { api_key: string | null; type: string | null; name: string };
+  const keys = await api<Key[]>(SB, token, "GET", `/projects/${ref}/api-keys?reveal=true`);
+  const publishable = keys.find((k) => k.type === "publishable")?.api_key;
+  const secret = keys.find((k) => k.type === "secret")?.api_key;
+  if (!publishable || !secret) throw new Error("Project has no publishable/secret API keys: create them in Supabase → Settings → API Keys");
+
+  const appEnv: Record<string, string> = {
+    NEXT_PUBLIC_SUPABASE_URL: url,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishable,
+    SUPABASE_SECRET_KEY: secret,
+    MSCHOOL_DEMO_MODE: "true",
+    OPENAI_EMBEDDING_MODEL: opt("OPENAI_EMBEDDING_MODEL") ?? "text-embedding-3-small",
+  };
+  for (const name of ["OPENAI_API_KEY", "OPENAI_TUTOR_MODEL", "OPENAI_ASSESSOR_MODEL", "OPENAI_WORKER_MODEL"]) {
+    const v = opt(name);
+    if (v) appEnv[name] = v;
+  }
+
+  mkdirSync(".secrets", { recursive: true });
+  if (existsSync(CREDS)) {
+    step(`Демо-данные уже созданы ранее (${CREDS}) — пропуск`);
+  } else {
+    step("Синтетические демо-данные");
+    const r = spawnSync("npx", ["tsx", "--conditions=react-server", "scripts/seed.ts"], {
+      stdio: "inherit",
+      env: { ...process.env, ...appEnv, ALLOW_SEED: "true", SEED_REMOTE_DEMO_CONFIRM: `SEED SYNTHETIC DEMO INTO ${ref}`, SEED_CREDENTIALS_FILE: CREDS },
+    });
+    if (r.status !== 0) throw new Error(`seed failed (exit ${r.status})`);
+  }
+
+  // The production *.vercel.app domain exists only after the first production deployment.
+  await vercelEnv(vercel, appEnv);
+  let origin = await vercelOrigin(vercel);
+  if (!origin) {
+    vercelDeploy(vercel);
+    origin = await vercelOrigin(vercel);
+    if (!origin) throw new Error("Vercel project has no domain after the first deployment");
+  }
 
   step("Настройки входа (адрес сайта, MFA, шаблоны писем, регистрация закрыта)");
   await api(SB, token, "PATCH", `/projects/${ref}/config/auth`, {
@@ -121,54 +185,15 @@ async function main() {
     mailer_templates_magic_link_content: template("magic_link"),
   });
 
-  type Key = { api_key: string | null; type: string | null; name: string };
-  const keys = await api<Key[]>(SB, token, "GET", `/projects/${ref}/api-keys?reveal=true`);
-  const publishable = keys.find((k) => k.type === "publishable")?.api_key;
-  const secret = keys.find((k) => k.type === "secret")?.api_key;
-  if (!publishable || !secret) throw new Error("Project has no publishable/secret API keys: create them in Supabase → Settings → API Keys");
+  // APP_ORIGIN is read at build time (HSTS) and at runtime (Origin checks): deploy after setting it.
+  await vercelEnv(vercel, { APP_ORIGIN: origin });
+  vercelDeploy(vercel);
 
-  const appEnv: Record<string, string> = {
-    APP_ORIGIN: origin,
-    NEXT_PUBLIC_SUPABASE_URL: url,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishable,
-    SUPABASE_SECRET_KEY: secret,
-  };
-  for (const name of ["OPENAI_API_KEY", "OPENAI_TUTOR_MODEL", "OPENAI_ASSESSOR_MODEL", "OPENAI_WORKER_MODEL", "OPENAI_EMBEDDING_MODEL"]) {
-    const v = opt(name);
-    if (v) appEnv[name] = v;
-  }
-
-  mkdirSync(".secrets", { recursive: true });
-  if (existsSync(CREDS)) {
-    step(`Демо-данные уже созданы ранее (${CREDS}) — пропуск`);
-  } else {
-    step("Синтетические демо-данные");
-    const r = spawnSync("npx", ["tsx", "--conditions=react-server", "scripts/seed.ts"], {
-      stdio: "inherit",
-      env: { ...process.env, ...appEnv, ALLOW_SEED: "true", SEED_REMOTE_DEMO_CONFIRM: `SEED SYNTHETIC DEMO INTO ${ref}`, SEED_CREDENTIALS_FILE: CREDS },
-    });
-    if (r.status !== 0) throw new Error(`seed failed (exit ${r.status})`);
-  }
-
-  if (renderKey && renderWeb) {
-    step("Переменные окружения Render и деплой");
-    const put = (id: string, key: string, value: string) =>
-      api(RENDER, renderKey, "PUT", `/services/${id}/env-vars/${key}`, { value });
-    for (const [k, v] of Object.entries(appEnv)) await put(renderWeb.id, k, v);
-    if (renderWorker) {
-      for (const k of ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "OPENAI_WORKER_MODEL", "OPENAI_EMBEDDING_MODEL"]) {
-        if (appEnv[k]) await put(renderWorker.id, k, appEnv[k]);
-      }
-      await api(RENDER, renderKey, "POST", `/services/${renderWorker.id}/deploys`, {});
-    }
-    // NEXT_PUBLIC_* are inlined at build time, so the web service must rebuild after they change.
-    await api(RENDER, renderKey, "POST", `/services/${renderWeb.id}/deploys`, { clearCache: "clear" });
-  }
-
+  const health = await fetch(`${origin}/api/health`).then((r) => r.status).catch(() => 0);
   const creds = JSON.parse(readFileSync(CREDS, "utf8")) as { password: string; accounts: Record<string, string>; superadmin_totp_secret: string };
   const card = [
     "MSchool — демо в интернете (синтетические данные)",
-    `Адрес:         ${origin}`,
+    `Адрес:         ${origin}   (health: ${health})`,
     `Пароль (все):  ${creds.password}`,
     `Сотрудник:     ${creds.accounts.emp_a_junior1}`,
     `HR (A / B):    ${creds.accounts.hr_a} / ${creds.accounts.hr_b}`,
@@ -176,7 +201,7 @@ async function main() {
     `Supabase:      ${ref}`,
   ].join("\n");
   writeFileSync(".secrets/hosted-demo-access.txt", `${card}\n`, { mode: 0o600 });
-  console.log(`\n${card}\n\n(сохранено в .secrets/hosted-demo-access.txt; сборка на Render занимает ~5–10 минут)`);
+  console.log(`\n${card}\n\n(сохранено в .secrets/hosted-demo-access.txt)`);
 }
 
 main().catch((error: unknown) => {
