@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { GraduationCap, ShieldCheck, ListChecks } from "lucide-react";
+import { BrandLogo } from "@/components/brand/logo";
 
 export default function HomePage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-5xl flex-col justify-center gap-10 px-4 py-12 md:px-8">
       <div className="space-y-4">
-        <p className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <GraduationCap className="size-5" aria-hidden /> MSchool
-        </p>
+        <BrandLogo width={150} />
         <h1 className="text-3xl font-semibold leading-tight md:text-4xl">
           Корпоративное обучение по утвержденным регламентам
         </h1>

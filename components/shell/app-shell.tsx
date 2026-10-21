@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { GraduationCap, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { BrandMark } from "@/components/brand/logo";
 import { cn } from "@/components/ui/cn";
 import { ThemeSwitcher } from "@/components/ui/theme-switcher";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -41,7 +42,7 @@ export function AppShell({ nav, title, userLabel, banner, children }: {
       {/* Desktop sidebar 248px; tablet collapses to an icon rail; mobile uses a drawer. */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[72px] flex-col border-r border-border bg-surface md:flex lg:w-[248px]">
         <div className="flex h-16 items-center gap-2 border-b border-border px-4 font-semibold">
-          <GraduationCap className="size-6 shrink-0" aria-hidden /><span className="md:max-lg:sr-only">MSchool</span>
+          <BrandMark size={36} /><span className="md:max-lg:sr-only">MSchool</span>
         </div>
         <div className="flex-1 overflow-y-auto">{links}</div>
       </aside>
@@ -50,7 +51,7 @@ export function AppShell({ nav, title, userLabel, banner, children }: {
           <button type="button" className="absolute inset-0 bg-black/50" aria-label="Закрыть меню" onClick={() => setOpen(false)} />
           <div className="absolute inset-y-0 left-0 w-[280px] max-w-[85vw] overflow-y-auto bg-surface shadow-xl">
             <div className="flex h-16 items-center justify-between border-b border-border px-4">
-              <span className="font-semibold">MSchool</span>
+              <span className="flex items-center gap-2 font-semibold"><BrandMark size={32} />MSchool</span>
               <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть меню"
                 className="inline-flex size-11 items-center justify-center rounded-lg hover:bg-muted"><X className="size-5" aria-hidden /></button>
             </div>
@@ -64,6 +65,7 @@ export function AppShell({ nav, title, userLabel, banner, children }: {
             aria-label="Открыть меню" aria-expanded={open} onClick={() => setOpen(true)}>
             <Menu className="size-5" aria-hidden />
           </button>
+          <BrandMark size={28} className="md:hidden" />
           <p className="min-w-0 flex-1 truncate font-medium">{title}</p>
           <span className="hidden max-w-56 truncate text-sm text-muted-foreground sm:inline">{userLabel}</span>
           <ThemeSwitcher />
