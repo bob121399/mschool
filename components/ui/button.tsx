@@ -6,7 +6,7 @@ import { cn } from "./cn";
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const variants: Record<ButtonVariant, string> = {
-  // Dark foreground on #20CC6D: white small text has insufficient contrast (spec 4.1).
+  // Dark foreground on the teal accent #20B8B4: white small text has insufficient contrast (spec 4.1, D-14).
   primary: "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active",
   secondary: "bg-surface text-foreground border border-border hover:bg-muted active:bg-muted/80",
   ghost: "bg-transparent text-foreground hover:bg-muted active:ring-2 active:ring-border",

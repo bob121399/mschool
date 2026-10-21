@@ -10,15 +10,16 @@
   --surface-muted: 215 25% 95%;
   --muted-foreground: 215 16% 38%;
   --border: 215 20% 82%;
-  --primary: 146.860465 72.881356% 46.274510%;
-  --primary-foreground: 154 72% 6%;
-  --primary-hover: 147 73% 42%;
-  --primary-active: 147 73% 37%;
+  /* Accent = logo teal #20B8B4 (owner decision D-14); success stays green as a separate semantic color. */
+  --primary: 178.421053 70.37037% 42.352941%;
+  --primary-foreground: 182 70% 6%;
+  --primary-hover: 178 70% 38%;
+  --primary-active: 178 70% 34%;
   --success: 146.860465 72.881356% 46.274510%;
   --success-text: 151 75% 22%;
   --danger: 0 72% 42%;
   --warning: 33 88% 28%;
-  --focus: 152 78% 26%;
+  --focus: 179 80% 24%;
   --radius: 0.75rem;
 }
 .dark {
@@ -29,15 +30,15 @@
   --surface-muted: 221 18% 16%;
   --muted-foreground: 215 14% 70%;
   --border: 219 15% 30%;
-  --primary: 146.860465 72.881356% 46.274510%;
-  --primary-foreground: 154 72% 6%;
-  --primary-hover: 147 73% 52%;
-  --primary-active: 147 73% 42%;
+  --primary: 178.421053 70.37037% 42.352941%;
+  --primary-foreground: 182 70% 6%;
+  --primary-hover: 178 70% 48%;
+  --primary-active: 178 70% 38%;
   --success: 146.860465 72.881356% 46.274510%;
   --success-text: 147 72% 67%;
   --danger: 0 90% 72%;
   --warning: 40 95% 66%;
-  --focus: 147 73% 60%;
+  --focus: 178 70% 58%;
 }
 @layer base {
   * { border-color: hsl(var(--border)); }

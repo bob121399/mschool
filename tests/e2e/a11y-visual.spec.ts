@@ -21,11 +21,11 @@ async function check(page: Page, name: string) {
   }
 }
 
-test("primary color is #20CC6D with dark foreground", async ({ page }) => {
+test("primary color is the logo teal #20B8B4 with dark foreground", async ({ page }) => {
   await page.goto("/");
   const btn = page.getByRole("link", { name: "Войти" });
   const [bg, fg] = await btn.evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color]);
-  expect(bg).toBe("rgb(32, 204, 109)");
+  expect(bg).toBe("rgb(32, 184, 180)");
   const lum = fg.match(/\d+/gu)!.slice(0, 3).map(Number).reduce((a, b) => a + b, 0);
   expect(lum).toBeLessThan(150);
 });
