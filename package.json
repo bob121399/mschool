@@ -20,7 +20,9 @@
     "probe": "tsx scripts/capability-probe.ts",
     "bootstrap:superadmin": "tsx scripts/bootstrap-superadmin.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "check:bundle": "tsx scripts/check-bundle-secrets.ts"
+    "check:bundle": "tsx scripts/check-bundle-secrets.ts",
+    "demo": "bash scripts/demo/demo.sh",
+    "demo:code": "tsx scripts/demo/code.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.3.1",

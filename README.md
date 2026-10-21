@@ -10,7 +10,16 @@
 - Архитектура / решения / метрики / runbook: `docs/architecture.md`, `docs/decisions.md`, `docs/metric-definitions.md`, `docs/runbook.md`
 - Инструкции для Claude Code: `CLAUDE.md`
 
-## Быстрый старт (локально)
+## Демо одной командой
+
+```bash
+npm run demo        # Docker + Node 22: чистая база, синтетические данные, сборка, web + worker
+npm run demo:code   # код MFA суперадмина
+```
+
+Сценарий показа и подготовка ноутбука: `docs/demo-guide.md`.
+
+## Быстрый старт (локально, вручную)
 
 ```bash
 npm ci
