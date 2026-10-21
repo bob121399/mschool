@@ -260,3 +260,20 @@ describe("Superadmin before MFA", () => {
     expect(own.data).toEqual([{ id: w.superadmin.id, role: "superadmin" }]);
   });
 });
+
+describe("Access state for routing (E-TS-19)", () => {
+  it("distinguishes no profile, suspended user and inactive tenant without exposing data", async () => {
+    const { createAuthUser } = await import("../../scripts/lib/world");
+    const fresh = `noprofile-${w.run}@test.mschool.local`;
+    await createAuthUser(w.admin, fresh, w.password);
+    expect((await (await signIn(fresh, w.password)).rpc("my_access_state")).data).toBe("no_profile");
+    const emp = w.a.employees[1]!;
+    expect((await emp.db.rpc("my_access_state")).data).toBe("ok");
+    await w.admin.from("users").update({ status: "suspended" }).eq("id", emp.id);
+    expect((await emp.db.rpc("my_access_state")).data).toBe("user_suspended");
+    await w.admin.from("users").update({ status: "active" }).eq("id", emp.id);
+    await w.admin.from("tenants").update({ status: "suspended" }).eq("id", w.a.tenantId);
+    expect((await emp.db.rpc("my_access_state")).data).toBe("tenant_inactive");
+    await w.admin.from("tenants").update({ status: "trial" }).eq("id", w.a.tenantId);
+  });
+});

@@ -28,3 +28,7 @@
 
 Образы локального Supabase загружаются из public.ecr.aws (Docker Hub в этой среде отвечал 429).
 `cacheComponents` выключен (decisions D-02).
+
+Дополнительно: `@pdf-lib/fontkit` (dev, генерация PDF-fixtures с кириллицей шрифтом DejaVu Sans из системы),
+Chromium для Playwright — предустановленный `/opt/pw-browsers/chromium` (`PW_EXECUTABLE_PATH`).
+ClamAV 1.5.4 установлен из apt, но сигнатуры недоступны (сетевая политика), поэтому сканер не запущен (BLK-02).

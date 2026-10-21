@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Final smoke runs against the production build (`next start`), spec 6 step 6.7.
+// Final smoke runs against the production build, spec 6 step 6.7. With `output: "standalone"` the
+// supported runner is the standalone server (same as the Docker `web` image), not `next start`.
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 60_000,
@@ -13,7 +14,7 @@ export default defineConfig({
     launchOptions: process.env.PW_EXECUTABLE_PATH ? { executablePath: process.env.PW_EXECUTABLE_PATH } : {},
   },
   webServer: {
-    command: "npm run start",
+    command: "bash scripts/start-standalone.sh",
     url: "http://localhost:3000/api/health",
     reuseExistingServer: true,
     timeout: 120_000,

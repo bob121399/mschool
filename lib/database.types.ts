@@ -990,6 +990,9 @@ isOneToOne: false
               "chunk_id": string,"content": string,"document_id": string,"page": number,"similarity": number,"title": string
             }[]
                            },
+"my_access_state":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
 "practice_questions":
 { Args: { "p_assignment": string,"p_lesson": string }; Returns: Json
                            },

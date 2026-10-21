@@ -27,7 +27,7 @@ production-развертывание не выполнены; без них MVP
 | S1-05 | Health без секретов | app/api/health/route.ts | e2e smoke | done |
 | S1-06 | Capability probe | scripts/capability-probe.ts | запуск без ключа → BLOCKED | blocked (BLK-01) |
 | S2-01 | Базовая миграция (с errata) | supabase/migrations/202610200001_mschool.sql | `supabase db reset` | done |
-| S2-02 | Операционные RPC | migrations 0002–0006 | tests/integration (71 тест) | done |
+| S2-02 | Операционные RPC | migrations 0002–0007 | tests/integration (5 файлов) | done |
 | S2-03 | Сгенерированные типы | lib/database.types.ts | CI diff | done |
 | S2-04 | Bootstrap superadmin | scripts/bootstrap-superadmin.ts | ручной запуск: отказ без подтверждения | impl |
 | S2-05 | Индексы/план retrieval и progress | migrations; docs/delivery-report.md | EXPLAIN | см. отчет |

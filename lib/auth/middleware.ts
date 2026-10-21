@@ -87,8 +87,12 @@ export async function middleware(request: NextRequest) {
       .select("role,tenant_id,status").eq("id", auth.user.id).maybeSingle();
     if (profileError) return deny(503, "DATABASE_UNAVAILABLE");
     if (!profile) {
+      // RLS hides the row both for "no profile yet" and for a suspended user/inactive tenant; only the
+      // former may reach onboarding (ERRATA E-TS-19).
+      const { data: state, error: stateError } = await db.rpc("my_access_state");
+      if (stateError) return deny(503, "DATABASE_UNAVAILABLE");
+      if (state !== "no_profile") return deny(403, "FORBIDDEN");
       // Verified Auth user without a profile: only onboarding/invitation pages are reachable.
-      // A suspended tenant also hides the profile row through RLS (private.tenant_id()).
       if (prefix("/onboarding") || path === "/login") {
         return path === "/login" ? deny(403, "PROFILE_REQUIRED") : carry(response);
       }

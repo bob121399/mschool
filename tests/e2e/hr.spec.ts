@@ -11,7 +11,9 @@ test("checklist reflects real entities", async ({ page }) => {
 test("employees table: server pagination, invite dialog focus trap and Esc", async ({ page }) => {
   await page.goto("/hr/employees");
   await expect(page.getByRole("table", { name: "Сотрудники компании" })).toBeVisible();
-  await expect(page.getByText("Всего: 12")).toBeVisible();
+  // ≥12: the invitation e2e flow may have added an employee to tenant A.
+  const total = Number((await page.getByText(/^Всего: \d+$/u).textContent())!.replace(/\D/gu, ""));
+  expect(total).toBeGreaterThanOrEqual(12);
   await page.getByPlaceholder("Поиск по email или имени").fill("middle");
   await expect(page).toHaveURL(/q=middle/u);
   await expect(page.getByText("Всего: 3")).toBeVisible();
