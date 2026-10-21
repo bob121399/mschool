@@ -976,6 +976,9 @@ isOneToOne: false
 "lesson_context":
 { Args: { "p_assignment": string,"p_lesson": string }; Returns: Json
                            },
+"log_superadmin_view":
+{ Args: { "p_reason": string,"p_scope": string,"p_tenant": string }; Returns: undefined
+                           },
 "mark_invoice_paid":
 { Args: { "p_invoice": string,"p_paid_at": string,"p_reason": string,"p_reference": string }; Returns: undefined
                            },
@@ -1044,6 +1047,9 @@ isOneToOne: false
 "set_document_status":
 { Args: { "p_document": string,"p_error"?: string,"p_job": string,"p_lease": string,"p_status": string }; Returns: undefined
                            },
+"set_own_name":
+{ Args: { "p_name": string }; Returns: undefined
+                           },
 "set_user_role":
 { Args: { "p_reason": string,"p_role": Database["public"]['Enums']["app_role"],"p_user": string }; Returns: undefined
                            },
@@ -1058,6 +1064,9 @@ isOneToOne: false
                            },
 "update_employee":
 { Args: { "p_clear_department"?: boolean,"p_department"?: string,"p_grade"?: Database["public"]['Enums']["grade"],"p_status"?: string,"p_user": string }; Returns: Json
+                           },
+"update_ticket_status":
+{ Args: { "p_resolution": string,"p_status": string,"p_ticket": string }; Returns: undefined
                            }
           }
           Enums: {

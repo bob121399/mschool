@@ -88,7 +88,7 @@ describe("SEC-04 no cross-tenant links", () => {
   it("rejects lesson_sources to a B chunk and draft payload with B chunk", async () => {
     const draftId = (await w.a.hr.rpc("create_course_draft", { p_title: "cross", p_grade: "junior", p_tenant: w.a.tenantId })).data!;
     const saved = await w.a.hr.rpc("save_course_draft", { p_course: draftId, p_expected_revision: 0, p_payload: {
-      modules: [{ title: "m", lessons: [{ title: "l", content: "c", requires_assessment: false, source_chunk_ids: [w.b.chunkIds[0]] }] }] } });
+      modules: [{ title: "m", lessons: [{ title: "l", content: "c", requires_assessment: false, source_chunk_ids: [w.b.chunkIds[0]!] }] }] } });
     expect(saved.error).not.toBeNull();
     const links = await w.admin.from("lesson_sources").select("lesson_id").eq("chunk_id", w.b.chunkIds[0]!).eq("tenant_id", w.a.tenantId);
     expect(links.data).toEqual([]);
