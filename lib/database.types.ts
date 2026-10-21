@@ -878,7 +878,7 @@ isOneToOne: false
 { Args: { "p_contract": Json,"p_currency": string,"p_minimum_minor": number,"p_period_end": string,"p_period_start": string,"p_reason": string,"p_seat_price_minor": number,"p_tenant": string,"p_tier": string }; Returns: string
                            },
 "admin_update_tenant":
-{ Args: { "p_max_daily_ai_calls": number,"p_reason": string,"p_status": string,"p_tenant": string,"p_tier": string }; Returns: undefined
+{ Args: { "p_max_daily_ai_calls"?: number,"p_reason": string,"p_status"?: string,"p_tenant": string,"p_tier"?: string }; Returns: undefined
                            },
 "analytics_template":
 { Args: { "p_end": string,"p_start": string,"p_template": string }; Returns: Json
@@ -974,6 +974,9 @@ isOneToOne: false
 { Args: { "p_end": string,"p_start": string,"p_tenant": string }; Returns: Json
                            },
 "lesson_context":
+{ Args: { "p_assignment": string,"p_lesson": string }; Returns: Json
+                           },
+"lesson_sources_for_learner":
 { Args: { "p_assignment": string,"p_lesson": string }; Returns: Json
                            },
 "log_superadmin_view":

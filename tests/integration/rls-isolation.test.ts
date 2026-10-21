@@ -186,8 +186,7 @@ describe("SEC-10 superadmin global scope requires MFA", () => {
     expect(edit.data ?? []).toEqual([]);
     const course = await w.admin.from("courses").select("title,status").eq("id", w.a.courseId).single();
     expect(course.data?.status).toBe("published");
-    const weakUpdate = await aal1.rpc("admin_update_tenant", { p_tenant: w.a.tenantId, p_tier: "growth", p_status: null as unknown as string,
-      p_max_daily_ai_calls: null as unknown as number, p_reason: "проверка без MFA" });
+    const weakUpdate = await aal1.rpc("admin_update_tenant", { p_tenant: w.a.tenantId, p_tier: "growth", p_reason: "проверка без MFA" });
     expect(weakUpdate.error?.message).toBe("FORBIDDEN");
   });
 });
