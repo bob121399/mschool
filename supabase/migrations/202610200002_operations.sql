@@ -50,6 +50,17 @@ language sql immutable set search_path = '' as $$
   select encode(extensions.digest(p, 'sha256'), 'hex');
 $$;
 
+-- Audit helper for SECURITY INVOKER RPCs: callers have no direct INSERT on admin_audit_logs.
+-- Only records for a tenant the caller manages, with actor = auth.uid().
+create function private.audit(p_tenant uuid, p_action text, p_object_type text, p_object uuid, p_diff jsonb)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  perform private.require_manage(p_tenant);
+  insert into public.admin_audit_logs(tenant_id,actor_id,action,object_type,object_id,redacted_diff)
+    values(p_tenant,auth.uid(),p_action,p_object_type,p_object,coalesce(p_diff,'{}'::jsonb));
+end;
+$$;
+
 create unique index invoices_payment_reference_unique on public.invoices(payment_reference)
   where payment_reference is not null;
 create index agent_jobs_tenant_idx on public.agent_jobs(tenant_id, created_at desc);
@@ -389,8 +400,7 @@ begin
         select src.tenant_id,lid,s.chunk_id from public.lesson_sources s where s.lesson_id = l.id;
     end loop;
   end loop;
-  insert into public.admin_audit_logs(tenant_id,actor_id,action,object_type,object_id,redacted_diff)
-    values(src.tenant_id,auth.uid(),'clone','course',nid,jsonb_build_object('supersedes',src.id,'version',v + 1));
+  perform private.audit(src.tenant_id,'clone','course',nid,jsonb_build_object('supersedes',src.id,'version',v + 1));
   return nid;
 end;
 $$;
@@ -1136,7 +1146,8 @@ revoke all on all functions in schema private from public, anon, authenticated;
 grant execute on function private.is_superadmin(),private.tenant_id(),private.can_manage(uuid),
   private.course_visible(uuid),private.lesson_visible(uuid),private.is_draft_course(uuid),
   private.is_draft_lesson(uuid),private.is_draft_track(uuid),private.require_manage(uuid),
-  private.acting_tenant(uuid),private.write_course_children(uuid,uuid,jsonb,uuid[]) to authenticated;
+  private.acting_tenant(uuid),private.write_course_children(uuid,uuid,jsonb,uuid[]),
+  private.audit(uuid,text,text,uuid,jsonb) to authenticated;
 grant execute on function private.write_course_children(uuid,uuid,jsonb,uuid[]) to service_role;
 
 revoke all on function
