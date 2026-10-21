@@ -1,6 +1,7 @@
 # Журнал выполнения MSchool MVP
 
-**Текущий этап:** Шаг 6 — итоговый прогон проверок, Docker, восстановление, отчет.
+**Текущий этап:** шаги 1–6 выполнены в пределах доступов; итоговый gate зеленый (см. `docs/delivery-report.md`).
+Ожидаются действия владельца по блокерам.
 **Статус MVP:** **incomplete / blocked** — см. блокеры. Live AI, антивирус для пользовательских загрузок и
 production-развертывание не выполнены; без них MVP не считается готовым (раздел 6.3).
 
@@ -38,7 +39,9 @@ production-развертывание не выполнены; без них MVP
 | S4-01 | proxy.ts → lib/auth/middleware.ts | proxy.ts | e2e auth | done |
 | S4-02 | login/logout/recovery/callback/confirm/onboarding/invite/MFA | app/login, app/auth/*, app/onboarding, app/invite, app/mfa | e2e auth, integration invitations | done (recovery/signup письма — только Mailpit) |
 | S4-03 | Повторная авторизация в layouts и routes | lib/auth/guard.ts, lib/auth/context.ts | e2e, integration ai-routes | done |
-| S4-04 | Bundle без секретов | scripts/check-bundle-secrets.ts | см. отчет | см. отчет |
+| S4-04 | Bundle без секретов | scripts/check-bundle-secrets.ts | `npm run check:bundle` = OK | done |
+| S4-05 | Приостановленный пользователь/компания → /forbidden, не onboarding | migration 0007, lib/auth/middleware.ts | integration «Access state», e2e auth | done |
+| S4-06 | Почтовые потоки: регистрация → подтверждение → onboarding; приглашение → принятие | app/auth/confirm, supabase/templates | tests/e2e/flows.spec.ts (локальный Mailpit) | done |
 | S5-01 | AI routes 5.2 | app/api/agents/* | tests/integration/ai-routes.test.ts | done (fake provider) |
 | S5-02 | 7 промптов + schemas + версии | prompts/*.v1.ts | evals | done |
 | S5-03 | Ingestion: magic bytes, hash, limits, scan, isolated parse, chunks, embeddings | app/api/hr/documents/*, worker/handlers/ingestion.ts | tests/integration/worker.test.ts | done (scanner/embeddings — test-only) |
@@ -46,8 +49,9 @@ production-развертывание не выполнены; без них MVP
 | S5-05 | API inventory 5.4 | app/api/** | integration + e2e | done (все эндпоинты реализованы) |
 | S5-06 | Evals | tests/evals | deterministic: pass; live: blocked | impl / blocked |
 | S6-01 | Seed (local only, guard, synthetic, canary B) | scripts/seed.ts | запуск + e2e | done |
-| S6-02 | Dockerfile/compose/healthcheck | Dockerfile, docker-compose.yml | см. отчет | см. отчет |
-| S6-03 | Restore exercise | docs/runbook.md | см. отчет | см. отчет |
+| S6-02 | Dockerfile/compose/healthcheck | Dockerfile, docker-compose.yml | docker build → 429 от реестра образов | impl, сборка не проверена |
+| S6-04 | Итоговый gate | scripts/dev/final-gate.sh | прогон 2: все 12 шагов exit 0, e2e 30/30 | done |
+| S6-03 | Restore exercise | scripts/dev/restore-exercise.sh, docs/runbook.md | RESTORE_EXERCISE=OK | done (Storage — на уровне файлов) |
 
 ## Приемочный набор 6.2
 
@@ -72,4 +76,4 @@ production-развертывание не выполнены; без них MVP
 | BILL-02 | unit billing-metrics | done |
 | BILL-03 | unit billing-metrics (125%) | done |
 | UX-01 | e2e a11y-visual, employee 390px | done |
-| OPS-01 | restore exercise | см. отчет |
+| OPS-01 | scripts/dev/restore-exercise.sh | done (локально, изолированный контейнер) |

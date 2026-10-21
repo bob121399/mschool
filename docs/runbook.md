@@ -5,11 +5,11 @@
 ```bash
 dockerd &                          # если демон не запущен (облачная песочница)
 npx supabase start                 # образы public.ecr.aws/supabase/*
-npx supabase db reset              # миграции 0001–0006 с нуля (только локально!)
+npx supabase db reset              # миграции 0001–0007 с нуля (только локально!)
 npm run db:types
 npx supabase status -o env         # значения для .env.local (см. .env.example)
 ALLOW_SEED=true npm run seed       # учетные данные: .secrets/seed-credentials.json (не в git)
-npm run build && npm run start     # http://localhost:3000
+npm run build && npm run start     # standalone server (как в Docker), http://localhost:3000
 npm run worker:dev                 # отдельный процесс
 ```
 

@@ -48,4 +48,5 @@ STOPSIGNAL SIGTERM
 # Liveness: the claim loop touches /tmp/worker-heartbeat; stale for >2 min → unhealthy.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "const s=require('fs').statSync('/tmp/worker-heartbeat');process.exit(Date.now()-s.mtimeMs<120000?0:1)"
-CMD ["npx", "tsx", "--conditions=react-server", "worker/main.ts"]
+# node is PID 1 so SIGTERM reaches the worker directly (graceful shutdown); tsx is loaded via --import.
+CMD ["node", "--import", "tsx", "--conditions=react-server", "worker/main.ts"]

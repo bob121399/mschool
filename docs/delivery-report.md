@@ -7,7 +7,7 @@
 ## Что реализовано
 
 - **БД (Supabase, PostgreSQL 17):** базовая миграция ТЗ с 12 исправлениями (одна ошибка делала миграцию
-  неприменимой: CASE внутри IF в `consume_ai_quota`) + 5 миграций операционных RPC: приглашения, CAS-сохранение
+  неприменимой: CASE внутри IF в `consume_ai_quota`) + 6 миграций операционных RPC: приглашения, CAS-сохранение
   и clone курсов, треки, апелляции с ручным override, одноразовые сессии урока для учета активности,
   durable jobs (claim/lease/heartbeat/retry), побочные эффекты worker с проверкой lease и активности tenant,
   billing (активные места, идемпотентные счета, ручное подтверждение оплаты), аналитика по allowlist,
@@ -28,26 +28,38 @@
 
 ## Исправления ТЗ
 
-Полный список с проверками — `docs/spec-errata.md` (SQL: 13, TS: 11, противоречия разделов: 6).
+Полный список с проверками — `docs/spec-errata.md` (SQL: 12, TS/маршруты: 11, противоречия разделов: 6).
+Ключевые: неприменимая миграция (CASE в IF), рекурсия политик без BYPASSRLS, superadmin без MFA на уровне БД,
+невозможность повторного назначения после смены грейда, учет активных мест только один раз за все время,
+503 вместо понятных бизнес-ошибок, недостижимый onboarding, резервирование попытки до проверки конфигурации ИИ,
+регистрозависимая проверка evidence.
 
 ## Выполненные проверки
 
 ### Итоговый прогон (раздел 6, шаг 6.7), `scripts/dev/final-gate.sh`, логи в `.secrets/final-gate/` (не в git)
 
+Прогон 1 (коммит 607924e): все шаги 0, кроме `test:e2e` = **1** (28 passed, 1 failed: тест таблицы сотрудников
+жестко ожидал 12 строк, а новый e2e-поток приглашения добавил сотрудника). Тест исправлен; дополнительно найдены и
+исправлены маршрутизация приостановленных пользователей (E-TS-19, миграция 0007) и запуск standalone-сервера.
+
+Прогон 2 (коммит 54a455a + рабочие правки документации), полностью с нуля:
+
 | Шаг | Команда | Exit code | Время | Результат |
 |---|---|---|---|---|
-| npm_ci | `npm ci` | 0 | 29 s | — |
-| db_reset | `npx supabase db reset` | 0 | 30 s | миграции 0001–0006 с нуля |
-| gen_types | `supabase gen types … && git diff --exit-code` | 0 | 2 s | типы совпадают с закоммиченными |
-| seed | `ALLOW_SEED=true npm run seed` | 0 | 16 s | 2 tenant, 24 сотрудника, 8 опубликованных курсов |
-| typecheck | `npm run typecheck` | 0 | 6 s | — |
-| lint | `npm run lint` (`--max-warnings=0`) | 0 | 13 s | — |
+| npm_ci | `npm ci` | 0 | 59 s | — |
+| db_reset | `npx supabase db reset` | 0 | 32 s | миграции 0001–0007 с нуля |
+| gen_types | `supabase gen types … && git diff --exit-code` | 0 | 3 s | типы совпадают с закоммиченными |
+| seed | `ALLOW_SEED=true npm run seed` | 0 | 19 s | 2 tenant, 24 сотрудника, 8 опубликованных курсов + 2 черновика |
+| typecheck | `npm run typecheck` | 0 | 7 s | — |
+| lint | `npm run lint` (`--max-warnings=0`) | 0 | 17 s | — |
 | test | `npm run test` | 0 | 2 s | 25/25 unit |
-| test:integration | `npm run test:integration` | 0 | 22 s | 55/55 на реальном локальном Supabase |
+| test:integration | `npm run test:integration` | 0 | 28 s | 56/56 на реальном локальном Supabase |
 | test:evals | `npm run test:evals` | 0 | 1 s | 36 passed, 1 skipped (live eval не выполнен — BLK-01) |
-| build | `npm run build` | 0 | 13 s | — |
-| check:bundle | `npm run check:bundle` | 0 | 0 s | секретов в браузерном бандле нет |
-| test:e2e | `npm run test:e2e` | E2E_CODE | E2E_TIME | E2E_RESULT |
+| build | `npm run build` | 0 | 40 s | — |
+| check:bundle | `npm run check:bundle` | 0 | 1 s | секретов в браузерном бандле нет |
+| test:e2e | `npm run test:e2e` (standalone server) | 0 | 159 s | 30/30 |
+
+Все тесты, касающиеся ИИ, используют test-only fake provider внутри тестового процесса. **Live AI smoke не выполнен.**
 
 ### Дополнительно
 
@@ -56,6 +68,9 @@
   invoices 4, auth.users 27) и md5 прогресса; 4 объекта Storage сверены по SHA-256 с `documents.sha256`.
   Ограничение: объекты проверены на уровне файлов, загрузка во второй Storage-сервис не выполнялась.
 - Capability probe: `npm run probe` → `BLOCKED` (exit 2): нет ключа и моделей.
+- Docker: `bash scripts/dev/docker-build-check.sh` → exit 1: registry `public.ecr.aws` ответил `429 Too Many Requests`
+  на базовый образ `node:22-bookworm-slim` (Docker Hub в этой среде также отвечает 429). **Сборка образов web/worker
+  не проверена**; Dockerfile и compose не запускались. Standalone-сервер, который использует образ `web`, проверен e2e.
 - Планы запросов: retrieval выполняет точный cosine только по заранее ограниченным chunks урока (CTE по
   `lesson_sources` + индексы `documents_tenant_idx`, `chunks_tenant_document_idx`), без глобального top-k и без HNSW.
   На объеме seed планировщик выбирает seq scan для `progress`/`activity_events`; индексы
@@ -72,5 +87,7 @@
 | OCR | Провайдер не выбран | Решение по OCR и его стоимости |
 | Сетевая изоляция parser-процесса | Не реализована (D-13) | Решение по контейнерной топологии |
 | Алерты/мониторинг | Нет выбранного стека | Выбор инструмента |
+| Сборка Docker-образов | Лимит реестра образов (429) в этой среде | Сборка в CI/окружении с доступом к реестру: `bash scripts/dev/docker-build-check.sh` |
+| Скриншоты ключевых экранов | Сделаны (синтетические данные): `docs/screenshots/*` (3 viewport × 2 темы) | — |
 
 Стоимость live smoke: **0** — live-вызовы провайдера не выполнялись.
