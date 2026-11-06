@@ -178,7 +178,10 @@ describe("BILL-01 active seats and idempotent invoices", () => {
     expect(i2.data).toBe(i1.data);
     const inv = await w.admin.from("invoices").select("active_seats,amount_minor,currency,status").eq("id", i1.data!).single();
     expect(inv.data).toEqual({ active_seats: 1, amount_minor: 30000, currency: "USD", status: "issued" });
-    const open = await w.admin.rpc("generate_invoice", { p_tenant: tenantId, p_period_start: "2026-10-01" });
+    // The current month is never closed (a fixed date here turned into a time bomb once it passed).
+    const now = new Date();
+    const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+    const open = await w.admin.rpc("generate_invoice", { p_tenant: tenantId, p_period_start: currentMonth });
     expect(open.error?.message).toBe("PERIOD_NOT_CLOSED");
     const hrView = await w.b.hr.from("invoices").select("id");
     expect(hrView.data).toHaveLength(1);
