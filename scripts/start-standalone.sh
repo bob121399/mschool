@@ -9,4 +9,4 @@ cp -r .next/static .next/standalone/.next/static
 cp -r public .next/standalone/public
 ENV_ARGS=()
 [ -f .env.local ] && ENV_ARGS=(--env-file=.env.local)
-exec env PORT="${PORT:-3000}" HOSTNAME="${HOSTNAME_BIND:-localhost}" node "${ENV_ARGS[@]}" .next/standalone/server.js
+exec env PORT="${PORT:-3000}" HOSTNAME="${HOSTNAME_BIND:-localhost}" node ${ENV_ARGS[@]+"${ENV_ARGS[@]}"} .next/standalone/server.js
