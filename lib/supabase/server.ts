@@ -3,13 +3,15 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/database.types";
 import { requiredEnv } from "@/lib/config";
+import { authCookieOptions, supabaseServerUrl } from "@/lib/supabase/url";
 
 export async function userDb() {
   const jar = await cookies();
   return createServerClient<Database>(
-    requiredEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    supabaseServerUrl(),
     requiredEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
     {
+      cookieOptions: authCookieOptions(),
       cookies: {
         getAll: () => jar.getAll(),
         setAll: (items) => {

@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { requiredEnv } from "@/lib/config";
+import { authCookieOptions, supabaseServerUrl } from "@/lib/supabase/url";
 
 // ERRATA E-TS-06/07 (docs/spec-errata.md): the listing redirected verified users without a
 // profile to /forbidden (onboarding and invitation acceptance became unreachable), had no
@@ -9,7 +10,8 @@ import { requiredEnv } from "@/lib/config";
 
 export function buildCsp(nonce: string, dev: boolean): string {
   const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const connect = ["'self'", supabase].filter(Boolean).join(" ");
+  // In same-origin mode ("/") Supabase is reached through 'self'.
+  const connect = ["'self'", supabase.startsWith("http") ? supabase : ""].filter(Boolean).join(" ");
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
@@ -68,9 +70,9 @@ export async function middleware(request: NextRequest) {
   };
   try {
     const db = createServerClient<Database>(
-      requiredEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      supabaseServerUrl(),
       requiredEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
-      { cookies: {
+      { cookieOptions: authCookieOptions(), cookies: {
         getAll: () => request.cookies.getAll(),
         setAll: (items) => {
           for (const { name, value } of items) request.cookies.set(name, value);

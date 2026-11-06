@@ -5,7 +5,7 @@ export type Db = SupabaseClient<Database>;
 export type Job = Database["public"]["Tables"]["agent_jobs"]["Row"];
 
 export function workerDb(): Db {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_INTERNAL_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;
   if (!url || !key) throw new Error("CONFIG_MISSING:SUPABASE");
   return createClient<Database>(url, key, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });

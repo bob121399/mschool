@@ -32,9 +32,11 @@ export function validateConfig(env: NodeJS.ProcessEnv = process.env): ConfigRepo
   const missing = WEB_REQUIRED_ENV.filter((name) => !env[name]?.trim());
   const aiMissing = AI_ENV.filter((name) => !env[name]?.trim());
   const invalid: string[] = [];
-  for (const name of ["APP_ORIGIN", "NEXT_PUBLIC_SUPABASE_URL"] as const) {
+  for (const name of ["APP_ORIGIN", "NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_INTERNAL_URL"] as const) {
     const value = env[name]?.trim();
     if (!value) continue;
+    // Same-origin mode (lib/supabase/url.ts) is valid only together with an internal URL.
+    if (name === "NEXT_PUBLIC_SUPABASE_URL" && value === "/" && env.SUPABASE_INTERNAL_URL?.trim()) continue;
     try {
       const url = new URL(value);
       if (url.protocol !== "http:" && url.protocol !== "https:") invalid.push(name);

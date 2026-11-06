@@ -8,7 +8,8 @@ test("anonymous is redirected to login with a local next", async ({ page }) => {
 
 test("open redirect is rejected", async ({ page }) => {
   await login(page, "emp_a_junior1", "//evil.example/steal");
-  await expect(page).toHaveURL(/localhost:3000\/learn/u);
+  // Stays on the app's own origin (localhost:3000, or the demo gateway host), never evil.example.
+  await expect(page).toHaveURL(/^http:\/\/(localhost|127\.0\.0\.1):\d+\/learn$/u);
 });
 
 test("employee cannot open HR or superadmin areas", async ({ page }) => {

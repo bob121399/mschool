@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:3000", trace: "retain-on-failure", screenshot: "only-on-failure",
+    baseURL: process.env.PW_BASE_URL ?? "http://localhost:3000", trace: "retain-on-failure", screenshot: "only-on-failure",
     // Pre-installed browser in the cloud sandbox; CI uses `npx playwright install`.
     launchOptions: process.env.PW_EXECUTABLE_PATH ? { executablePath: process.env.PW_EXECUTABLE_PATH } : {},
   },

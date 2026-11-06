@@ -10,7 +10,7 @@ export type Db = SupabaseClient<Database>;
 export type Grade = Database["public"]["Enums"]["grade"];
 
 export function supabaseEnv() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_INTERNAL_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publishable = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   const secret = process.env.SUPABASE_SECRET_KEY;
   if (!url || !publishable || !secret) throw new Error("CONFIG_MISSING: NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY/SECRET_KEY");
