@@ -88,6 +88,19 @@ function template(name: string) {
   return readFileSync(`supabase/templates/${name}.html`, "utf8");
 }
 
+function emailTemplates() {
+  return {
+    mailer_subjects_invite: "Приглашение в MSchool",
+    mailer_subjects_confirmation: "Подтвердите email для MSchool",
+    mailer_subjects_recovery: "Восстановление пароля MSchool",
+    mailer_subjects_magic_link: "Вход в MSchool",
+    mailer_templates_invite_content: template("invite"),
+    mailer_templates_confirmation_content: template("confirmation"),
+    mailer_templates_recovery_content: template("recovery"),
+    mailer_templates_magic_link_content: template("magic_link"),
+  };
+}
+
 type Vercel = { token: string; teamId: string; projectId: string };
 
 async function vercelProject(token: string): Promise<Vercel> {
@@ -150,7 +163,7 @@ async function vercelDeploy(v: Vercel) {
 
 async function main() {
   const token = env("SUPABASE_ACCESS_TOKEN");
-  const vercel = await vercelProject(env("VERCEL_TOKEN"));
+  const vercelToken = env("VERCEL_TOKEN");
 
   const project = await supabaseProject(token);
   const ref = project.ref;
@@ -189,6 +202,8 @@ async function main() {
     if (r.status !== 0) throw new Error(`seed failed (exit ${r.status})`);
   }
 
+  // Vercel last: the Supabase part (migrations, seed) is idempotent and can be re-run alone.
+  const vercel = await vercelProject(vercelToken);
   // The production *.vercel.app domain exists only after the first production deployment.
   await vercelEnv(vercel, appEnv);
   let origin = opt("DEMO_APP_ORIGIN") ?? await vercelOrigin(vercel);
@@ -198,8 +213,8 @@ async function main() {
     if (!origin) throw new Error("Vercel project has no domain after the first deployment");
   }
 
-  step("Настройки входа (адрес сайта, MFA, шаблоны писем, регистрация закрыта)");
-  await api(SB, token, "PATCH", `/projects/${ref}/config/auth`, {
+  step("Настройки входа (адрес сайта, MFA, регистрация закрыта, шаблоны писем — если план позволяет)");
+  const authBase = {
     site_url: origin,
     uri_allow_list: `${origin}/auth/callback,${origin}/auth/confirm`,
     // Public demo link: strangers must not create companies; accounts come from the seed only.
@@ -207,15 +222,15 @@ async function main() {
     password_min_length: 12,
     mfa_totp_enroll_enabled: true,
     mfa_totp_verify_enabled: true,
-    mailer_subjects_invite: "Приглашение в MSchool",
-    mailer_subjects_confirmation: "Подтвердите email для MSchool",
-    mailer_subjects_recovery: "Восстановление пароля MSchool",
-    mailer_subjects_magic_link: "Вход в MSchool",
-    mailer_templates_invite_content: template("invite"),
-    mailer_templates_confirmation_content: template("confirmation"),
-    mailer_templates_recovery_content: template("recovery"),
-    mailer_templates_magic_link_content: template("magic_link"),
-  });
+  };
+  // Free-tier projects on the default email provider reject template changes; the demo sends no mail.
+  await api(SB, token, "PATCH", `/projects/${ref}/config/auth`, { ...authBase, ...emailTemplates() })
+    .catch(async (error: unknown) => {
+      if (!String(error).includes("Email template modification is not available")) throw error;
+      console.log("  шаблоны писем пропущены: нужен свой SMTP или платный план Supabase");
+      await api(SB, token, "PATCH", `/projects/${ref}/config/auth`, authBase);
+    });
+
 
   // APP_ORIGIN is read at build time (HSTS) and at runtime (Origin checks): deploy after setting it.
   await vercelEnv(vercel, { APP_ORIGIN: origin });
