@@ -1,14 +1,17 @@
 // Sets up the HOSTED DEMO: a dedicated Supabase project (created if needed) + a Vercel project for the
-// Next.js app. Synthetic data only. Refuses any Supabase project whose name lacks "demo" and seeds only
-// into a project with no tenants, so it cannot touch an environment with real customers.
+// Next.js app. Synthetic data only. Refuses a Supabase project whose name lacks "demo" unless its ref is
+// passed explicitly, and seeds only into a project with no tenants, so it cannot touch an environment
+// with real customers. Everything goes over HTTPS APIs (migrations through the Management API SQL
+// endpoint), so no direct Postgres connection or database password is needed for an existing project.
 // The durable worker is not hosted on Vercel: background jobs (new uploads, weekly reports) stay queued.
 //
-// Required env: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, VERCEL_TOKEN.
-// Optional env: DEMO_SUPABASE_PROJECT_REF (else a project "mschool-demo" is found or created),
-//   SUPABASE_ORG_SLUG / VERCEL_TEAM_ID (when the account has several), OPENAI_* (live AI).
+// Required env: SUPABASE_ACCESS_TOKEN, VERCEL_TOKEN (either may be a proxy-injected placeholder).
+// Optional env: DEMO_SUPABASE_PROJECT_REF (else a project "mschool-demo" is found or created, which
+//   needs SUPABASE_DB_PASSWORD), SUPABASE_ORG_SLUG / VERCEL_TEAM_ID / VERCEL_PROJECT (when ambiguous),
+//   DEMO_APP_ORIGIN (default: the project's *.vercel.app domain), OPENAI_* (live AI).
 // Run: npm run demo:hosted
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const SB = "https://api.supabase.com/v1";
 const VERCEL = "https://api.vercel.com";
@@ -38,7 +41,7 @@ async function api<T>(base: string, token: string, method: string, path: string,
 
 type Project = { id?: string; ref?: string; name: string; status: string; organization_slug?: string };
 
-async function supabaseProject(token: string, dbPassword: string): Promise<Project & { ref: string }> {
+async function supabaseProject(token: string): Promise<Project & { ref: string }> {
   const projects = await api<Project[]>(SB, token, "GET", "/projects");
   const refOf = (p: Project) => (p.ref ?? p.id)!;
   const wanted = opt("DEMO_SUPABASE_PROJECT_REF");
@@ -50,10 +53,11 @@ async function supabaseProject(token: string, dbPassword: string): Promise<Proje
     if (!slug) throw new Error(`Several organizations (${orgs.map((o) => o.slug).join(", ")}): set SUPABASE_ORG_SLUG`);
     step(`Создание проекта Supabase «${PROJECT_NAME}» (eu-central-1)`);
     project = await api<Project>(SB, token, "POST", "/projects", {
-      name: PROJECT_NAME, organization_slug: slug, db_pass: dbPassword, region: "eu-central-1",
+      name: PROJECT_NAME, organization_slug: slug, db_pass: env("SUPABASE_DB_PASSWORD"), region: "eu-central-1",
     });
   }
-  if (!/demo/iu.test(project.name)) throw new Error(`Refusing: project "${project.name}" is not a demo project (name must contain "demo")`);
+  // An explicitly named project is the owner's choice; the seed still refuses one that has tenants.
+  if (!wanted && !/demo/iu.test(project.name)) throw new Error(`Refusing: project "${project.name}" is not a demo project (name must contain "demo")`);
   const ref = refOf(project);
   for (let i = 0; i < 90; i += 1) {
     const p = await api<Project>(SB, token, "GET", `/projects/${ref}`);
@@ -64,9 +68,20 @@ async function supabaseProject(token: string, dbPassword: string): Promise<Proje
   throw new Error(`Project ${ref} did not become ACTIVE_HEALTHY in 15 minutes`);
 }
 
-function cli(args: string[], extraEnv: Record<string, string>) {
-  const r = spawnSync("npx", ["supabase", ...args], { stdio: "inherit", env: { ...process.env, ...extraEnv } });
-  if (r.status !== 0) throw new Error(`supabase ${args.join(" ")} failed (exit ${r.status})`);
+/** Applies supabase/migrations/*.sql in order through the Management API, recording each version in
+ * the same table the Supabase CLI uses, so a later `supabase db push` skips them. */
+async function migrate(token: string, ref: string) {
+  const sql = (query: string) => api<unknown[]>(SB, token, "POST", `/projects/${ref}/database/query`, { query });
+  await sql(`create schema if not exists supabase_migrations;
+    create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text);`);
+  const applied = new Set((await sql("select version from supabase_migrations.schema_migrations") as { version: string }[]).map((r) => r.version));
+  for (const file of readdirSync("supabase/migrations").filter((f) => f.endsWith(".sql")).sort()) {
+    const [version, ...rest] = file.replace(/\.sql$/u, "").split("_");
+    if (applied.has(version!)) { console.log(`  = ${file}`); continue; }
+    await sql(readFileSync(`supabase/migrations/${file}`, "utf8"));
+    await sql(`insert into supabase_migrations.schema_migrations(version, name) values ('${version}', '${rest.join("_").replace(/'/gu, "")}')`);
+    console.log(`  + ${file}`);
+  }
 }
 
 function template(name: string) {
@@ -77,12 +92,15 @@ type Vercel = { token: string; teamId: string; projectId: string };
 
 async function vercelProject(token: string): Promise<Vercel> {
   const teams = await api<{ teams: { id: string; slug: string }[] }>(VERCEL, token, "GET", "/v2/teams");
-  const teamId = opt("VERCEL_TEAM_ID") ?? (teams.teams.length === 1 ? teams.teams[0]!.id : undefined);
+  // Hobby accounts list no teams; their personal scope is the user's default team.
+  const user = teams.teams.length ? undefined : await api<{ user: { defaultTeamId?: string } }>(VERCEL, token, "GET", "/v2/user");
+  const teamId = opt("VERCEL_TEAM_ID") ?? (teams.teams.length === 1 ? teams.teams[0]!.id : user?.user.defaultTeamId);
   if (!teamId) throw new Error(`Several Vercel teams (${teams.teams.map((t) => `${t.slug}=${t.id}`).join(", ")}): set VERCEL_TEAM_ID`);
   const q = `teamId=${encodeURIComponent(teamId)}`;
+  const name = opt("VERCEL_PROJECT") ?? PROJECT_NAME;
   let id: string;
   try {
-    id = (await api<{ id: string }>(VERCEL, token, "GET", `/v9/projects/${PROJECT_NAME}?${q}`)).id;
+    id = (await api<{ id: string }>(VERCEL, token, "GET", `/v9/projects/${name}?${q}`)).id;
   } catch (error) {
     if (!String(error).includes("→ 404")) throw error;
     step(`Создание проекта Vercel «${PROJECT_NAME}»`);
@@ -92,7 +110,7 @@ async function vercelProject(token: string): Promise<Vercel> {
 }
 
 async function vercelEnv(v: Vercel, values: Record<string, string>) {
-  const body = Object.entries(values).map(([key, value]) => ({ key, value, type: "encrypted", target: ["production"] }));
+  const body = Object.entries(values).map(([key, value]) => ({ key, value, type: "encrypted", target: ["production", "preview"] }));
   const res = await api<{ failed: unknown[] }>(VERCEL, v.token, "POST", `/v10/projects/${v.projectId}/env?upsert=true&teamId=${v.teamId}`, body);
   if (res.failed.length) throw new Error(`Vercel env: ${JSON.stringify(res.failed).slice(0, 300)}`);
 }
@@ -103,8 +121,25 @@ async function vercelOrigin(v: Vercel): Promise<string | undefined> {
   return domain ? `https://${domain}` : undefined;
 }
 
-function vercelDeploy(v: Vercel) {
+/** Production deployment: from the connected Git repository when the project has one (DEMO_GIT_REF,
+ * default: the current branch), otherwise an upload of the working tree with the Vercel CLI. */
+async function vercelDeploy(v: Vercel) {
   step("Сборка и публикация на Vercel (~3–5 минут)");
+  const project = await api<{ name: string; link?: { type?: string; repoId?: number } }>(VERCEL, v.token, "GET", `/v9/projects/${v.projectId}?teamId=${v.teamId}`);
+  if (project.link?.type === "github" && project.link.repoId) {
+    const ref = opt("DEMO_GIT_REF") ?? spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"]).stdout.toString().trim();
+    const dep = await api<{ id: string; url: string }>(VERCEL, v.token, "POST", `/v13/deployments?teamId=${v.teamId}&forceNew=1`, {
+      name: project.name, project: v.projectId, target: "production",
+      gitSource: { type: "github", repoId: project.link.repoId, ref },
+    });
+    for (let i = 0; i < 90; i += 1) {
+      const d = await api<{ readyState: string }>(VERCEL, v.token, "GET", `/v13/deployments/${dep.id}?teamId=${v.teamId}`);
+      if (d.readyState === "READY") return dep.url;
+      if (d.readyState === "ERROR" || d.readyState === "CANCELED") throw new Error(`Vercel deployment ${dep.id} ${d.readyState}`);
+      await sleep(10_000);
+    }
+    throw new Error(`Vercel deployment ${dep.id} did not finish in 15 minutes`);
+  }
   const r = spawnSync("npx", ["--yes", VERCEL_CLI, "deploy", "--prod", "--yes", "--token", v.token], {
     stdio: ["ignore", "pipe", "inherit"],
     env: { ...process.env, VERCEL_ORG_ID: v.teamId, VERCEL_PROJECT_ID: v.projectId, VERCEL_TELEMETRY_DISABLED: "1" },
@@ -115,17 +150,14 @@ function vercelDeploy(v: Vercel) {
 
 async function main() {
   const token = env("SUPABASE_ACCESS_TOKEN");
-  const dbPassword = env("SUPABASE_DB_PASSWORD");
   const vercel = await vercelProject(env("VERCEL_TOKEN"));
 
-  const project = await supabaseProject(token, dbPassword);
+  const project = await supabaseProject(token);
   const ref = project.ref;
   const url = `https://${ref}.supabase.co`;
 
   step("Миграции");
-  const cliEnv = { SUPABASE_ACCESS_TOKEN: token, SUPABASE_DB_PASSWORD: dbPassword };
-  cli(["link", "--project-ref", ref], cliEnv);
-  cli(["db", "push", "--linked", "--yes"], cliEnv);
+  await migrate(token, ref);
 
   type Key = { api_key: string | null; type: string | null; name: string };
   const keys = await api<Key[]>(SB, token, "GET", `/projects/${ref}/api-keys?reveal=true`);
@@ -159,9 +191,9 @@ async function main() {
 
   // The production *.vercel.app domain exists only after the first production deployment.
   await vercelEnv(vercel, appEnv);
-  let origin = await vercelOrigin(vercel);
+  let origin = opt("DEMO_APP_ORIGIN") ?? await vercelOrigin(vercel);
   if (!origin) {
-    vercelDeploy(vercel);
+    await vercelDeploy(vercel);
     origin = await vercelOrigin(vercel);
     if (!origin) throw new Error("Vercel project has no domain after the first deployment");
   }
@@ -187,7 +219,7 @@ async function main() {
 
   // APP_ORIGIN is read at build time (HSTS) and at runtime (Origin checks): deploy after setting it.
   await vercelEnv(vercel, { APP_ORIGIN: origin });
-  vercelDeploy(vercel);
+  await vercelDeploy(vercel);
 
   const health = await fetch(`${origin}/api/health`).then((r) => r.status).catch(() => 0);
   const creds = JSON.parse(readFileSync(CREDS, "utf8")) as { password: string; accounts: Record<string, string>; superadmin_totp_secret: string };
